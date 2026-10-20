@@ -1,0 +1,1825 @@
+<title>Vantage Horizon</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Crect width='36' height='36' rx='9' fill='%23121e2c'/%3E%3Cpath d='M6 24 L13 19 L18 21 L23 15' stroke='white' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Cpath d='M23 15 L30 9' stroke='%236f9df2' stroke-width='3' stroke-dasharray='2.5 2.5' fill='none'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a control strip on top, then a "horizon" chart where the past is solid ink and the
+   future is a tinted band; decision panels (drivers, alerts, what-if) sit beside it. */
+:root {
+  --bg: #f3f5f8; --surface: #ffffff; --surface-2: #eef2f7; --ink: #121e2c; --ink-2: #46546a;
+  --muted: #76839a; --line: #dde3eb; --grid: #e9edf2;
+  --actual: #121e2c; --fc: #2a63d4; --band80: rgba(42, 99, 212, .20); --band95: rgba(42, 99, 212, .09);
+  --future-tint: rgba(42, 99, 212, .05); --pos: #2a78d6; --neg: #e34948;
+  --good: #0a7d0a; --good-bg: #e3f4e3; --warn: #8a5b00; --warn-bg: #fdf0d2; --crit: #b42c2c; --crit-bg: #fbe3e3;
+  --focus: #2a63d4; --teams: #5b5fc7;
+  --sun-bg: #fff3d1; --cloud-bg: #eceff4; --rain-bg: #e4ecfb; --sun: #f2a900; --rain: #3b6fd8;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --sun-bg: #3a3112; --cloud-bg: #222b37; --rain-bg: #1b2a45; --sun: #f6c445; --rain: #6f9df2;
+  --bg: #0e131a; --surface: #151c25; --surface-2: #1b2430; --ink: #e7ecf2; --ink-2: #aab5c3;
+  --muted: #7d8a9b; --line: #263241; --grid: #1f2935;
+  --actual: #e7ecf2; --fc: #6f9df2; --band80: rgba(111, 157, 242, .26); --band95: rgba(111, 157, 242, .11);
+  --future-tint: rgba(111, 157, 242, .06); --pos: #3987e5; --neg: #e66767;
+  --good: #5fd35f; --good-bg: rgba(12, 163, 12, .16); --warn: #f6bd47; --warn-bg: rgba(250, 178, 25, .14);
+  --crit: #f08080; --crit-bg: rgba(208, 59, 59, .18); --focus: #6f9df2; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --sun-bg: #3a3112; --cloud-bg: #222b37; --rain-bg: #1b2a45; --sun: #f6c445; --rain: #6f9df2;
+  --bg: #0e131a; --surface: #151c25; --surface-2: #1b2430; --ink: #e7ecf2; --ink-2: #aab5c3;
+  --muted: #7d8a9b; --line: #263241; --grid: #1f2935;
+  --actual: #e7ecf2; --fc: #6f9df2; --band80: rgba(111, 157, 242, .26); --band95: rgba(111, 157, 242, .11);
+  --future-tint: rgba(111, 157, 242, .06); --pos: #3987e5; --neg: #e66767;
+  --good: #5fd35f; --good-bg: rgba(12, 163, 12, .16); --warn: #f6bd47; --warn-bg: rgba(250, 178, 25, .14);
+  --crit: #f08080; --crit-bg: rgba(208, 59, 59, .18); --focus: #6f9df2; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+.wrap > * { min-width: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--f-body); }
+.wrap { max-width: 1280px; margin: 0 auto; padding-inline: 20px; padding-block: 20px 40px; display: grid; gap: 16px; }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.eyebrow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* header */
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand svg { flex: none; }
+.brand h1 { font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
+.brand p { margin: 0; color: var(--ink-2); font-size: 13px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 500; background: var(--surface-2); color: var(--ink-2); white-space: nowrap; }
+.chip .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.chip.good { background: var(--good-bg); color: var(--good); }
+.chip.warn { background: var(--warn-bg); color: var(--warn); }
+.chip.crit { background: var(--crit-bg); color: var(--crit); }
+
+/* controls */
+.controls { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+.seg button { border: 0; background: none; padding: 7px 14px; border-radius: 9px; cursor: pointer; text-align: left; line-height: 1.25; }
+.seg button small { display: block; font-size: 11px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.seg button[aria-pressed="true"] small { color: inherit; opacity: .75; }
+.seg button:hover:not([aria-pressed="true"]) { background: var(--surface-2); }
+.seg.small button { padding: 5px 11px; font-size: 13px; }
+select { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.controls label { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 13px; }
+
+/* narrative */
+.story { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); }
+.story p { margin: 0; max-width: 95ch; font-size: 15px; }
+.story .src { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* tiles */
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.tile .val { font-family: var(--f-display); font-size: 32px; font-weight: 700; letter-spacing: -.01em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tile .val.fc { color: var(--fc); }
+.tile .range { font-size: 12.5px; color: var(--ink-2); }
+.tile .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.delta.up { color: var(--good); } .delta.down { color: var(--crit); }
+
+/* grid */
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: stretch; }
+.main > .col > .panel:only-child { height: 100%; }
+.col { display: grid; gap: 16px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.panel h2 { font-size: 17px; font-weight: 700; }
+.panel .sub { color: var(--muted); font-size: 12.5px; margin: 2px 0 0; }
+
+/* chart */
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; }
+.chart text { font-family: var(--f-mono); font-size: 11px; fill: var(--muted); }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); min-width: 170px; z-index: 2; }
+.tip b { font-family: var(--f-display); font-size: 13px; }
+.tip .r { display: flex; justify-content: space-between; gap: 12px; }
+.tip .r span:last-child { font-family: var(--f-mono); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 18px; height: 10px; vertical-align: -1px; margin-right: 6px; border-radius: 2px; }
+
+/* drivers */
+.drivers { display: grid; gap: 8px; }
+.drv { display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: 4px 10px; align-items: center; }
+.drv .name { font-size: 13px; }
+.drv .pct { font-family: var(--f-mono); font-size: 12.5px; text-align: right; }
+.drv .bar { grid-column: 1 / -1; position: relative; height: 8px; background: var(--surface-2); border-radius: 4px; }
+.drv .bar span { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.drv .bar::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--muted); }
+.total { display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 8px; font-weight: 600; }
+
+/* alerts */
+.alerts { display: grid; gap: 10px; }
+.warn-row { margin-top: 16px; }
+.warn-row .alerts { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); align-items: stretch; }
+.warn-row .alert { align-content: start; }
+.alert { border: 1px solid var(--line); border-left: 4px solid var(--warn); border-radius: 8px; padding: 10px 12px; display: grid; gap: 4px; }
+.alert.critical { border-left-color: var(--crit); }
+.alert .t { font-weight: 600; font-size: 13.5px; }
+.alert .d { font-size: 12.5px; color: var(--ink-2); }
+.spark { display: flex; gap: 3px; align-items: flex-end; height: 26px; }
+.spark span { flex: 1; background: var(--neg); border-radius: 2px 2px 0 0; min-height: 2px; }
+.spark span.ok { background: var(--line); }
+
+/* what-if */
+.wi { display: grid; gap: 12px; }
+.wi label { display: grid; gap: 4px; font-size: 13px; }
+.wi .lab { display: flex; justify-content: space-between; }
+.wi .lab b { font-family: var(--f-mono); font-weight: 500; }
+input[type="range"] { width: 100%; accent-color: var(--fc); }
+.wi-out { background: var(--surface-2); border-radius: 8px; padding: 12px; display: grid; gap: 4px; }
+.wi-out .big { font-family: var(--f-display); font-size: 24px; font-weight: 700; color: var(--fc); font-variant-numeric: tabular-nums; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 12.5px; }
+.btn:hover { background: var(--surface-2); }
+
+/* tables */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: right; font-weight: 600; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { text-align: right; padding: 8px; border-bottom: 1px solid var(--grid); font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; font-family: var(--f-body); }
+tr.sel td { background: var(--surface-2); }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: var(--surface-2); }
+
+/* accuracy */
+.acc { display: grid; gap: 8px; }
+.acc .row { display: grid; grid-template-columns: minmax(0, 190px) minmax(0, 1fr) 52px; gap: 10px; align-items: center; font-size: 12.5px; }
+.acc .track { position: relative; height: 10px; background: var(--surface-2); border-radius: 4px; }
+.acc .track span { position: absolute; left: 0; top: 0; bottom: 0; background: var(--muted); border-radius: 0 4px 4px 0; }
+.acc .row.best .track span { background: var(--fc); }
+.acc .track i { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--crit); }
+.acc .v { font-family: var(--f-mono); text-align: right; }
+
+/* pipeline */
+.pipe { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.pipe div { background: var(--surface-2); border-radius: 8px; padding: 10px; font-size: 12px; color: var(--ink-2); position: relative; }
+.pipe b { display: block; color: var(--ink); font-size: 12.5px; margin-bottom: 2px; }
+footer { color: var(--muted); font-size: 12px; }
+
+/* motion */
+@keyframes grow { from { transform: scaleX(0.02); } to { transform: scaleX(1); } }
+@keyframes rise { from { transform: translateY(6px); opacity: .55; } to { transform: none; opacity: 1; } }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 var(--crit); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+@keyframes flow { to { stroke-dashoffset: -24; } }
+.drv .bar span, .acc .track span { transform-origin: left center; animation: grow .75s cubic-bezier(.2,.8,.2,1) both; }
+.drv .bar span.neg { transform-origin: right center; }
+.panel, .tile, .story, .ask { animation: rise .5s ease-out both; }
+.alert.critical .chip .dot, .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--crit); display: inline-block; animation: pulse 1.8s infinite; }
+.live-dot { background: var(--good); animation: none; }
+
+/* header tools */
+.tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.tbtn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; color: var(--ink); }
+.tbtn:hover { background: var(--surface-2); }
+.tbtn.primary { background: var(--fc); border-color: var(--fc); color: #fff; }
+kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--surface); }
+
+/* under the hood */
+.uth { display: grid; gap: 16px; }
+.flowwrap { overflow-x: auto; }
+.flow { display: grid; grid-template-columns: repeat(6, minmax(130px, 1fr)); gap: 10px; position: relative; min-width: 820px; }
+.flow svg.wire { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.node { position: relative; z-index: 1; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 4px; align-content: start; }
+.node .st { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--good); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.node b { font-family: var(--f-display); font-size: 14px; }
+.node .m { font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-2); line-height: 1.45; }
+.node code { font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+.mcard { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.mc { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 6px; align-content: start; }
+.mc .v { font-family: var(--f-display); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mc .d { font-size: 12.5px; color: var(--ink-2); }
+.mc pre { margin: 0; font-family: var(--f-mono); font-size: 11.5px; white-space: pre-wrap; color: var(--ink); background: var(--surface-2); border-radius: 6px; padding: 8px; }
+.wbar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; }
+.wbar span { display: block; height: 100%; }
+.cal { display: flex; gap: 6px; align-items: flex-end; height: 70px; padding-top: 6px; }
+.cal div { flex: 1; display: grid; gap: 3px; justify-items: center; font-size: 10px; color: var(--muted); font-family: var(--f-mono); }
+.cal .col { position: relative; width: 100%; height: 50px; background: var(--surface-2); border-radius: 4px; }
+.cal .band { position: absolute; left: 15%; right: 15%; background: var(--band80); border-radius: 3px; }
+.cal .dot { position: absolute; left: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--actual); }
+.cal .mid { position: absolute; left: 10%; right: 10%; height: 2px; margin-top: -1px; background: var(--fc); }
+
+/* api inspector */
+.apibtn { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 8; display: inline-flex; gap: 8px; align-items: center; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 8px 14px; font-family: var(--f-mono); font-size: 12px; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.12); }
+.drawer { position: fixed; right: 16px; bottom: calc(60px + env(safe-area-inset-bottom, 0px)); z-index: 8; width: min(460px, calc(100vw - 32px)); max-height: 60vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 50px rgba(0,0,0,.2); padding: 12px; display: grid; gap: 8px; }
+.call { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-family: var(--f-mono); font-size: 11.5px; display: grid; gap: 4px; animation: rise .3s ease-out both; }
+.call .top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.call .meth { font-weight: 600; color: var(--fc); }
+.call .ok { color: var(--good); } .call .bad { color: var(--crit); }
+.call pre { margin: 0; white-space: pre-wrap; word-break: break-all; color: var(--ink-2); max-height: 120px; overflow: auto; }
+
+/* guided tour */
+.tour-on { outline: 3px solid var(--fc) !important; outline-offset: 4px; border-radius: var(--r); position: relative; z-index: 6; }
+.tourcard { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 9; width: min(620px, calc(100vw - 32px)); background: var(--ink); color: var(--bg); border-radius: 14px; padding: 14px 16px; display: grid; gap: 8px; box-shadow: 0 18px 50px rgba(0,0,0,.3); animation: rise .35s ease-out both; }
+.tourcard .stp { font-family: var(--f-mono); font-size: 11px; opacity: .7; }
+.tourcard h3 { font-size: 17px; }
+.tourcard p { margin: 0; font-size: 14px; opacity: .9; }
+.tourcard .nav { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.tourcard button { border: 1px solid rgba(255,255,255,.25); background: transparent; color: inherit; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+:root[data-theme="light"] .tourcard button, .tourcard button { border-color: color-mix(in srgb, var(--bg) 35%, transparent); }
+.tourcard button.go2 { background: var(--fc); border-color: var(--fc); color: #fff; }
+.tourbar { height: 3px; background: color-mix(in srgb, var(--bg) 20%, transparent); border-radius: 2px; overflow: hidden; }
+.tourbar span { display: block; height: 100%; background: var(--fc); transition: width .3s; }
+.toast { position: fixed; left: 50%; top: 16px; transform: translateX(-50%); z-index: 9; background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 10px; font-size: 13px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+@media (prefers-reduced-motion: reduce) { .drv .bar span, .acc .track span, .panel, .tile, .story, .ask, .call, .tourcard { animation: none; } .flow path { animation: none !important; } }
+@media (max-width: 1020px) { .mcard { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .mcard { grid-template-columns: minmax(0, 1fr); } }
+
+/* business weather */
+.wx { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.wxc { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 4px; cursor: pointer; text-align: left; background: var(--surface); color: var(--ink); font: inherit; animation: rise .5s ease-out both; }
+.wxc:hover { border-color: var(--fc); }
+.wxc[aria-pressed="true"] { border-color: var(--fc); box-shadow: 0 0 0 2px var(--fc) inset; }
+.wxc.sunny { background: linear-gradient(160deg, var(--sun-bg), var(--surface) 70%); }
+.wxc.cloudy { background: linear-gradient(160deg, var(--cloud-bg), var(--surface) 70%); }
+.wxc.rain, .wxc.storm { background: linear-gradient(160deg, var(--rain-bg), var(--surface) 70%); }
+.wxc .mo { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.wxc .ic { position: absolute; right: 10px; top: 8px; width: 64px; height: 64px; }
+.wxc .big { font-family: var(--f-display); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 6px; }
+.wxc .say { font-size: 13px; font-weight: 600; }
+.wxc .odds { font-size: 12px; color: var(--ink-2); }
+.wxc .meter { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; margin-top: 4px; }
+.wxc .meter span { display: block; height: 100%; border-radius: 3px; transform-origin: left; animation: grow .9s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes drop { 0% { transform: translateY(-4px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(10px); opacity: 0; } }
+@keyframes drift { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(3px); } }
+@keyframes flashb { 0%, 88%, 100% { opacity: 0; } 90%, 94% { opacity: 1; } }
+.ic .rays { transform-origin: 32px 32px; animation: spin 14s linear infinite; }
+.ic .cl { animation: drift 4s ease-in-out infinite; }
+.ic .dr { animation: drop 1.1s linear infinite; }
+.ic .dr:nth-of-type(2) { animation-delay: .35s; } .ic .dr:nth-of-type(3) { animation-delay: .7s; }
+.ic .bolt { animation: flashb 3s infinite; }
+.story-tools { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.playing { background: var(--crit) !important; border-color: var(--crit) !important; color: #fff !important; }
+.mic { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 9px 11px; cursor: pointer; display: grid; place-items: center; }
+.mic.on { background: var(--crit); border-color: var(--crit); }
+.mic.on svg path, .mic.on svg rect { stroke: #fff; }
+#confetti { position: fixed; inset: 0; pointer-events: none; z-index: 20; }
+@media (max-width: 1020px) { .wx { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .ic .rays, .ic .cl, .ic .dr, .ic .bolt, .wxc, .wxc .meter span { animation: none; } }
+
+/* hero: four questions */
+.hero { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.hq { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 6px; align-content: start; animation: rise .5s ease-out both; }
+.hq .q { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fc); }
+.hq .big { font-family: var(--f-display); font-size: 34px; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.hq .mid { font-family: var(--f-display); font-size: 20px; font-weight: 700; line-height: 1.2; }
+.hq .s { font-size: 13px; color: var(--ink-2); }
+.hq .s b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.hq .lnk { justify-self: start; border: 0; background: none; color: var(--fc); font-weight: 600; font-size: 13px; padding: 0; cursor: pointer; }
+.hq .lnk:hover { text-decoration: underline; }
+.rangebar { position: relative; height: 10px; border-radius: 5px; background: var(--surface-2); margin: 6px 0 2px; }
+.rangebar span { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
+.rangebar i { position: absolute; top: -3px; bottom: -3px; width: 2px; }
+
+/* action required */
+.action { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: center; border-radius: 14px; padding: 16px 18px; border: 1px solid var(--line); background: var(--surface); animation: rise .5s ease-out both; }
+.action.crit { border-color: var(--crit); background: linear-gradient(90deg, var(--crit-bg), var(--surface) 60%); }
+.action.warn { border-color: var(--warn); background: linear-gradient(90deg, var(--warn-bg), var(--surface) 60%); }
+.action.good { border-color: var(--good); background: linear-gradient(90deg, var(--good-bg), var(--surface) 60%); }
+.action .tag { font-family: var(--f-display); font-weight: 700; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.action .pct { font-family: var(--f-display); font-size: 40px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.action .body { display: grid; gap: 3px; min-width: 0; }
+.action .body .t { font-family: var(--f-display); font-size: 19px; font-weight: 700; }
+.action .body .d { font-size: 13.5px; color: var(--ink-2); }
+.action .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* early-warning chain */
+.chain { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.step { position: relative; border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 4px; align-content: start; background: var(--surface); animation: rise .45s ease-out both; }
+.step::after { content: "→"; position: absolute; right: -8px; top: 50%; transform: translate(50%, -50%); color: var(--muted); font-size: 14px; z-index: 1; }
+.step:last-child::after { content: none; }
+.step .n { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.step .v { font-family: var(--f-display); font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.step .x { font-size: 12px; color: var(--ink-2); }
+.step.bad { border-color: color-mix(in srgb, var(--crit) 55%, var(--line)); }
+.step.bad .v { color: var(--crit); }
+.step.ok .v { color: var(--good); }
+
+/* scenario lab */
+.impact { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.imp { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; }
+.imp .k { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.imp .v { font-family: var(--f-display); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.imp .x { font-size: 11.5px; color: var(--ink-2); }
+.scn3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.scn { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 6px; align-content: start; position: relative; }
+.scn.rec { border-color: var(--fc); box-shadow: 0 0 0 2px var(--fc) inset; }
+.scn .nm { font-family: var(--f-display); font-weight: 700; font-size: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.scn .val { font-family: var(--f-display); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.scn ul { margin: 2px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--ink-2); }
+.scn .row2 { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12.5px; color: var(--ink-2); }
+.badge { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; border-radius: 999px; padding: 2px 8px; background: var(--fc); color: #fff; }
+.compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.cmp h4 { margin: 0 0 6px; font-family: var(--f-body); font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.cbar { display: grid; grid-template-columns: 92px minmax(0, 1fr) 84px; gap: 8px; align-items: center; font-size: 12.5px; margin: 5px 0; }
+.cbar .tr { position: relative; height: 14px; background: var(--surface-2); border-radius: 4px; }
+.cbar .tr span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; transform-origin: left; animation: grow .8s cubic-bezier(.2,.8,.2,1) both; }
+.cbar .tr i { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--warn); }
+.cbar .vv { font-family: var(--f-mono); text-align: right; font-size: 12px; }
+#tested tr.recrow td { background: color-mix(in srgb, var(--fc) 12%, transparent); font-weight: 600; }
+.formula { font-size: 12.5px; color: var(--ink-2); background: var(--surface-2); border-radius: 8px; padding: 10px 12px; }
+.formula code { font-family: var(--f-mono); font-size: 12px; color: var(--ink); }
+.wibox { background: var(--bg); }
+.wibox h3 { font-size: 15px; }
+
+/* section headings & trust */
+h2.sect { font-size: 22px; margin-top: 10px; scroll-margin-top: 16px; }
+.trustgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.tcard { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 4px; align-content: start; }
+.tcard .k { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.tcard .v { font-family: var(--f-display); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tcard .x { font-size: 12.5px; color: var(--ink-2); }
+#trust .note { font-size: 12.5px; color: var(--ink-2); }
+.story .lines { display: grid; gap: 6px; }
+.story .ln { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; font-size: 14.5px; }
+.story .ln b { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--fc); padding-top: 3px; }
+@media (max-width: 1020px) { .hero, .impact, .trustgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .chain { grid-template-columns: repeat(3, minmax(0, 1fr)); } .step::after { content: none; } .scn3 { grid-template-columns: minmax(0, 1fr); } .compare { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) { .hero, .impact, .trustgrid, .chain { grid-template-columns: minmax(0, 1fr); } .action { grid-template-columns: minmax(0, 1fr); } .story .ln { grid-template-columns: minmax(0, 1fr); gap: 2px; } .hq .big { font-size: 30px; } }
+
+/* currency picker */
+.cur { position: relative; }
+.curbtn { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 10px 4px 6px; cursor: pointer; font-size: 12.5px; color: var(--ink); }
+.curbtn:hover { background: var(--surface-2); }
+.curbtn .fl, .curopt .fl { font-size: 18px; line-height: 1; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--surface-2); overflow: hidden; }
+.curbtn b { font-family: var(--f-mono); font-weight: 600; }
+.curbtn .car { font-size: 10px; color: var(--muted); }
+.curpop { position: absolute; left: 0; top: calc(100% + 6px); z-index: 12; width: min(330px, calc(100vw - 32px)); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 18px 50px rgba(0,0,0,.18); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: min(440px, 70vh); overflow: hidden; animation: rise .18s ease-out both; }
+.curpop .srch { padding: 10px; border-bottom: 1px solid var(--line); }
+.curpop .srch input { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+.curlist { overflow-y: auto; padding: 4px 0; overscroll-behavior: contain; }
+.curgrp { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 8px 14px 4px; }
+.curopt { display: grid; grid-template-columns: 24px 44px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; border: 0; background: none; padding: 7px 14px; text-align: left; cursor: pointer; color: var(--ink); font-size: 13px; }
+.curopt:hover, .curopt.act { background: var(--surface-2); }
+.curopt[aria-selected="true"] { background: color-mix(in srgb, var(--fc) 12%, transparent); }
+.curopt .cd { font-family: var(--f-mono); font-weight: 600; }
+.curopt .nm { color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.curopt .rt { font-family: var(--f-mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
+.curpop .note { font-size: 11px; color: var(--muted); padding: 8px 14px; border-top: 1px solid var(--line); }
+
+/* takeaways */
+.takeaway { display: block; background: var(--surface-2); border-radius: 8px; padding: 10px 12px; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
+.takeaway:empty { display: none; }
+.takeaway::before { content: "In short"; display: inline-block; margin-right: 8px; vertical-align: 1px; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fc); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; margin-top: 1px; }
+.takeaway b { font-variant-numeric: tabular-nums; }
+
+/* ask box */
+.ask { display: grid; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; }
+.ask { grid-template-columns: minmax(0, 1fr); }
+.ask form { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.ask input { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 15px; }
+.ask .go { border: 0; background: var(--ink); color: var(--bg); border-radius: 10px; padding: 10px 16px; font-weight: 600; cursor: pointer; }
+.ask .ex { display: flex; flex-wrap: wrap; gap: 6px; }
+.ask .ex button { border: 1px dashed var(--line); background: none; border-radius: 999px; padding: 3px 10px; font-size: 12px; color: var(--ink-2); cursor: pointer; }
+.ask .ex button:hover { border-style: solid; color: var(--ink); }
+.ask .ans { font-size: 14px; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); }
+.ask .ans small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+.flash { animation: flash 1.2s ease-out; }
+@keyframes flash { 0% { box-shadow: 0 0 0 3px var(--fc); } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+/* teams preview */
+.modal { position: fixed; inset: 0; background: rgba(10, 14, 20, .55); display: grid; place-items: center; padding: 16px; z-index: 10; }
+.teams { width: min(560px, 100%); max-height: 90vh; overflow: auto; background: var(--surface); border-radius: 12px; border: 1px solid var(--line); box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+.teams-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--teams); color: #fff; border-radius: 12px 12px 0 0; }
+.teams-bar b { font-family: var(--f-body); font-size: 14px; }
+.teams-bar .x { margin-left: auto; background: none; border: 0; color: #fff; font-size: 20px; cursor: pointer; line-height: 1; }
+.teams-body { padding: 14px; display: grid; gap: 10px; }
+.teams-msg { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; }
+.teams-av { width: 32px; height: 32px; border-radius: 50%; background: var(--teams); display: grid; place-items: center; }
+.teams-meta { font-size: 12px; color: var(--muted); }
+.teams-meta b { color: var(--ink); font-size: 13px; margin-right: 6px; }
+.acard { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 8px; background: var(--bg); }
+.acard .h { font-weight: 700; font-size: 15px; }
+.acard .c { border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+.acard .c.critical { background: var(--crit-bg); } .acard .c.warning { background: var(--warn-bg); }
+.acard .c b { display: block; }
+.teams-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; font-size: 12px; color: var(--muted); }
+
+/* heatmap */
+.hm-groups { display: grid; gap: 12px; }
+.stack { display: grid; gap: 16px; min-width: 0; }
+.stack .hm-groups { display: flex; flex-wrap: wrap; gap: 16px 28px; align-items: flex-start; }
+.stack .hm-group { flex: var(--n) 1 0; min-width: 190px; }
+.hm-group h3 { font-family: var(--f-body); font-size: 12px; font-weight: 600; color: var(--ink-2); margin: 0 0 6px; display: flex; justify-content: space-between; gap: 8px; }
+.hm { display: flex; flex-wrap: wrap; gap: 2px; }
+.hm i { width: 11px; height: 11px; border-radius: 2px; cursor: pointer; display: block; }
+.hm i:hover, .hm i.on { outline: 2px solid var(--ink); outline-offset: 1px; }
+.hm-legend { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted); flex-wrap: wrap; }
+.hm-legend .grad { width: 160px; height: 10px; border-radius: 3px; }
+.hm-detail { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; font-size: 13px; }
+.hm-detail .k { color: var(--muted); }
+.hm-find { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--ink-2); }
+.hm-find input { width: 90px; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 5px 8px; }
+@media (prefers-reduced-motion: reduce) { .flash { animation: none; } }
+
+@media (max-width: 1020px) { .main { grid-template-columns: minmax(0, 1fr); } .pipe { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .wrap { padding-inline: 16px; }
+  .tiles { grid-template-columns: minmax(0, 1fr); }
+  .pipe { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .acc .row { grid-template-columns: minmax(0, 1fr) 52px; } .acc .row .track { grid-column: 1 / -1; grid-row: 2; }
+  .tile .val { font-size: 28px; }
+  .ask label { display: none; }
+  #model-chip { white-space: normal; }
+}
+@media (prefers-reduced-motion: no-preference) { .tile, .panel, .story { transition: border-color .2s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><rect width="36" height="36" rx="9" fill="var(--ink)"/><path d="M6 24 L13 19 L18 21 L23 15" stroke="var(--bg)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M23 15 L30 9" stroke="var(--fc)" stroke-width="2.4" stroke-dasharray="2.5 2.5" fill="none" stroke-linecap="round"/><line x1="23" y1="6" x2="23" y2="30" stroke="var(--bg)" stroke-width="1" opacity=".5"/></svg>
+      <div>
+        <h1>Vantage Horizon</h1>
+        <p id="meta-line">Loading forecast…</p>
+      </div>
+    </div>
+    <div class="tools">
+      <div class="cur" id="cur">
+        <button class="curbtn" id="cur-btn" type="button" aria-haspopup="listbox" aria-expanded="false" title="Change currency"><span class="fl" id="cur-flag"></span><b id="cur-code">EUR</b><span class="car">▾</span></button>
+        <div class="curpop" id="cur-pop" hidden>
+          <div class="srch"><input id="cur-q" type="text" placeholder="Search currency or country" aria-label="Search currency" autocomplete="off"></div>
+          <div class="curlist" id="cur-list" role="listbox" aria-label="Currencies"></div>
+          <div class="note" id="cur-note"></div>
+        </div>
+      </div>
+      <button class="tbtn primary" id="tour-btn" type="button" title="Guided demo (T)">▶ Guided demo</button>
+      <button class="tbtn" id="theme-btn" type="button" title="Toggle dark mode (D)"><svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg> Dark / light</button>
+      <button class="tbtn" id="keys-btn" type="button" title="Keyboard shortcuts (?)"><kbd>?</kbd> Shortcuts</button>
+    </div>
+    <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="chip" id="mode-chip"><span class="dot"></span>Loading</span>
+      <span class="chip" id="model-chip"></span>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="seg" id="view-seg" role="group" aria-label="Time view"></div>
+    <label for="segment">Stores <select id="segment"></select></label>
+    <button class="tbtn" id="play-btn" type="button" title="Play the next 90 days month by month">▶ Play the future</button>
+    <button class="tbtn" id="demo-btn" type="button" title="Reset to the final-round demo starting point">⟲ Demo mode</button>
+  </div>
+
+  <section class="hero" id="hero" aria-label="Summary: four questions">
+    <div class="hq" id="hq-what"></div>
+    <div class="hq" id="hq-conf"></div>
+    <div class="hq" id="hq-why"></div>
+    <div class="hq" id="hq-do"></div>
+  </section>
+
+  <section class="action" id="action" aria-live="polite"></section>
+
+  <section class="panel" id="ew" aria-labelledby="ew-h">
+    <div class="panel-head"><div><h2 id="ew-h">Early warning, step by step</h2><p class="sub" id="ew-sub"></p></div><span class="chip" id="ew-demo" hidden>Controlled demo scenario</span></div>
+    <div class="chain" id="chain"></div>
+  </section>
+
+  <section class="panel" id="scenarios" aria-labelledby="scn-h">
+    <div class="panel-head"><div><h2 id="scn-h">Scenario Lab</h2><p class="sub" id="scn-sub"></p></div><button class="tbtn primary" id="rec-btn" type="button">Recommend action</button></div>
+    <div class="impact" id="impact"></div>
+    <div class="scn3" id="scn3"></div>
+    <div class="compare" id="compare"></div>
+    <div class="tbl-wrap"><table id="tested"></table></div>
+    <div class="formula" id="formula"></div>
+    <div class="takeaway" id="tk-scn"></div>
+    <div class="panel wibox" id="wi-box">
+      <div class="panel-head"><div><h3 id="wi-h">Build your own scenario</h3><p class="sub" id="wi-sub"></p></div><button class="btn" id="wi-reset" type="button">Reset</button></div>
+        <div class="wi">
+          <label for="wi-promo"><span class="lab">Promo days in the month <b id="wi-promo-v"></b></span><input type="range" id="wi-promo" min="-6" max="6" step="1" value="0"></label>
+          <label for="wi-foot"><span class="lab">Footfall change <b id="wi-foot-v"></b></span><input type="range" id="wi-foot" min="-15" max="15" step="0.5" value="0"></label>
+          <label for="wi-ticket"><span class="lab">Average ticket change <b id="wi-ticket-v"></b></span><input type="range" id="wi-ticket" min="-10" max="10" step="0.5" value="0"></label>
+          <div class="wi-out" id="wi-out"></div>
+          <div class="takeaway" id="tk-wi"></div>
+        </div>
+    </div>
+  </section>
+
+  <div class="story" id="story">
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style="flex:none;margin-top:2px"><circle cx="10" cy="10" r="9" fill="none" stroke="var(--fc)" stroke-width="1.6"/><path d="M10 5v6l4 2" stroke="var(--fc)" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
+    <div style="min-width:0;flex:1"><div id="story-text"></div><div class="src" id="story-src"></div>
+      <div class="story-tools"><button class="btn" id="speak-btn" type="button"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><path d="M2 6h3l4-3v10l-4-3H2z" fill="currentColor"/><path d="M11.5 5.5a3.5 3.5 0 0 1 0 5M13.5 3.5a6.3 6.3 0 0 1 0 9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Read it aloud</button><button class="btn" id="copy-btn" type="button">Copy summary for Teams / WhatsApp</button></div></div>
+  </div>
+
+  <h2 class="sect" id="why">Why is this happening?</h2>
+  <div class="main">
+    <div class="col">
+      <section class="panel" aria-labelledby="chart-h">
+        <div class="panel-head">
+          <div><h2 id="chart-h">Monthly sales</h2><p class="sub" id="chart-sub"></p></div>
+          <div class="seg small" id="metric-seg" role="group" aria-label="Metric"></div>
+        </div>
+        <div class="chart" id="chart"></div>
+        <div class="legend">
+          <span><i style="background:var(--actual);height:2px;vertical-align:3px"></i>Actual</span>
+          <span><i style="border-top:2px dashed var(--fc);height:0;vertical-align:3px"></i>Forecast (median)</span>
+          <span><i style="background:var(--band80)"></i>80% range</span>
+          <span><i style="background:var(--band95)"></i>95% range</span>
+          <span><i style="width:9px;height:9px;border:2px solid var(--fc);border-radius:50%;background:var(--surface)"></i>Past forecast (backtest)</span>
+          <span id="lg-target"><i style="width:14px;height:0;border-top:2px solid var(--warn);vertical-align:3px"></i>Target</span>
+        </div>
+        <div class="takeaway" id="tk-chart"></div>
+      </section>
+    </div>
+    <div class="col">
+      <section class="panel" aria-labelledby="drv-h">
+        <div><h2 id="drv-h">Why next month is different</h2><p class="sub" id="drv-sub"></p></div>
+        <div class="drivers" id="drivers"></div>
+        <div class="takeaway" id="tk-drv"></div>
+      </section>
+    </div>
+  </div>
+  <section class="panel warn-row" aria-labelledby="al-h">
+    <div class="panel-head"><div><h2 id="al-h">Early warnings</h2><p class="sub" id="al-sub"></p></div><button class="btn" id="teams-btn" type="button">Preview in Teams</button></div>
+    <div class="alerts" id="alerts"></div>
+    <div class="takeaway" id="tk-al"></div>
+  </section>
+
+  <h2 class="sect" id="trust-h">Can I trust it?</h2>
+  <section class="panel" id="trust" aria-labelledby="trust-h"></section>
+  <section class="panel" aria-labelledby="acc-h">
+        <div class="panel-head"><div><h2 id="acc-h">Backtest, month by month</h2><p class="sub" id="acc-sub"></p></div></div>
+        <div class="acc" id="acc"></div>
+        <div class="tbl-wrap"><table id="bt-table"></table></div>
+        <div class="takeaway" id="tk-acc"></div>
+  </section>
+
+  <h2 class="sect">Explore</h2>
+  <div class="ask" id="ask">
+    <form id="ask-form" autocomplete="off">
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style="flex:none"><circle cx="8.5" cy="8.5" r="6" fill="none" stroke="var(--fc)" stroke-width="1.8"/><path d="M13 13l5 5" stroke="var(--fc)" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <label for="ask-q" class="eyebrow" style="flex:none">Ask Vantage</label>
+      <input id="ask-q" type="text" placeholder="e.g. Will store type D hit target in November?">
+      <button class="mic" id="mic-btn" type="button" title="Ask by voice" aria-label="Ask by voice"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5" fill="none" stroke="var(--ink)" stroke-width="1.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2.5" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+      <button class="go" type="submit">Ask</button>
+    </form>
+    <div class="ex" id="ask-ex"></div>
+    <div class="ans" id="ask-ans" hidden></div>
+  </div>
+  <section aria-labelledby="wx-h" style="display:grid;gap:10px">
+    <div class="panel-head"><div><h2 id="wx-h" style="font-size:17px">Business weather</h2><p class="sub" id="wx-sub"></p></div></div>
+    <div class="wx" id="wx"></div>
+    <div class="takeaway" id="tk-wx"></div>
+  </section>
+  <div class="tiles" id="tiles"></div>
+  <div class="stack">
+    <div class="col">
+      <section class="panel" aria-labelledby="seg-h">
+        <div class="panel-head"><div><h2 id="seg-h">By store type</h2><p class="sub" id="seg-sub"></p></div></div>
+        <div class="tbl-wrap"><table id="seg-table"></table></div>
+        <div class="takeaway" id="tk-seg"></div>
+      </section>
+    </div>
+    <div class="col">
+      <section class="panel" aria-labelledby="hm-h" id="hm-panel">
+        <div class="panel-head">
+          <div><h2 id="hm-h">Every store at a glance</h2><p class="sub" id="hm-sub"></p></div>
+          <div class="seg small" id="hm-seg" role="group" aria-label="Heatmap measure"></div>
+        </div>
+        <div class="hm-legend" id="hm-legend"></div>
+        <div class="hm-groups" id="hm"></div>
+        <div class="hm-find"><label for="hm-store">Find store #</label><input id="hm-store" type="number" min="1" placeholder="707"></div>
+        <div class="hm-detail" id="hm-detail" hidden></div>
+        <div class="takeaway" id="tk-hm"></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="panel uth" aria-labelledby="pipe-h" id="uth">
+    <div class="panel-head">
+      <div><h2 id="pipe-h">How it reaches the business</h2><p class="sub">Production architecture on the Microsoft stack, and what stands in for each part in this offline demo. Below: the model card behind every number.</p></div>
+      <span class="chip good"><span class="live-dot"></span>Last run <span id="uth-run"></span></span>
+    </div>
+    <div class="flowwrap"><div class="flow" id="flow"></div></div>
+    <div class="mcard" id="mcard"></div>
+    <div class="takeaway" id="tk-uth"></div>
+  </section>
+  <footer id="foot"></footer>
+</div>
+<button class="apibtn" id="api-btn" type="button" aria-expanded="false"><span class="live-dot" id="api-dot"></span><span id="api-count">API · 0 calls</span></button>
+<div class="drawer" id="api-drawer" hidden>
+  <div class="panel-head"><div><h2 style="font-size:15px">Live API inspector</h2><p class="sub">Every request this page makes to the FastAPI backend, with latency and payload.</p></div><button class="btn" type="button" id="api-clear">Clear</button></div>
+  <div id="api-list" style="display:grid;gap:8px"></div>
+</div>
+<div class="tourcard" id="tour" hidden role="dialog" aria-live="polite">
+  <div class="tourbar"><span id="tour-bar"></span></div>
+  <span class="stp" id="tour-step"></span>
+  <h3 id="tour-title"></h3>
+  <p id="tour-text"></p>
+  <div class="nav"><button type="button" id="tour-exit">Exit</button><button type="button" id="tour-back">Back</button><button type="button" class="go2" id="tour-next">Next →</button></div>
+</div>
+<div class="toast" id="toast" hidden></div>
+<canvas id="confetti" hidden></canvas>
+<div class="modal" id="teams-modal" hidden role="dialog" aria-modal="true" aria-labelledby="teams-title">
+  <div class="teams">
+    <div class="teams-bar"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="1" y="3" width="11" height="12" rx="2" fill="#fff" opacity=".9"/><circle cx="14" cy="5" r="2.5" fill="#fff" opacity=".7"/><path d="M4 6.5h5M6.5 6.5v6" stroke="var(--teams)" stroke-width="1.6"/></svg><b id="teams-title">Microsoft Teams · #retail-forecasting</b><button class="x" id="teams-x" type="button" aria-label="Close">×</button></div>
+    <div class="teams-body" id="teams-body"></div>
+  </div>
+</div>
+
+<script>
+const EMBED = /*__VANTAGE_DATA__*/null;
+const S = { view: 1, seg: "All", metric: "sales", D: null, live: false, wiTimer: null, prevVals: {}, animChart: true, hmMode: "foot", hmSel: null };
+const REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (id) => document.getElementById(id);
+const MON = (ym, fmt = "short") => new Date(ym + "-01T00:00:00").toLocaleString("en-GB", { month: fmt, year: fmt === "long" ? "numeric" : undefined });
+const MONY = (ym) => new Date(ym + "-01T00:00:00").toLocaleString("en-GB", { month: "short", year: "numeric" });
+const fmt = {
+  sales: (v) => money(v),
+  customers: (v) => (v / 1e6).toFixed(2) + "M",
+  ticket: (v) => moneySmall(v),
+};
+const axisFmt = { sales: (v) => money(v, true), customers: (v) => (v / 1e6).toFixed(0) + "M", ticket: (v) => moneySmall(v, true) };
+const pct = (v, d = 1) => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(d) + "%";
+/* ---------- currency ---------- */
+const FX_DATE = "6 Oct 2026";
+// [code, name, country code for flag, symbol, rate per 1 EUR, ticket decimals, spoken word]
+const CURRENCIES = [
+  ["EUR", "Euro", "EU", "€", 1, 2, "euro"],
+  ["INR", "Indian rupee", "IN", "₹", 107.899529, 2, "rupees"],
+  ["USD", "US dollar", "US", "$", 1.12094, 2, "dollars"],
+  ["GBP", "British pound", "GB", "£", 0.848308, 2, "pounds"],
+  ["AED", "UAE dirham", "AE", "AED ", 4.117489, 2, "dirhams"],
+  ["JPY", "Japanese yen", "JP", "¥", 177.16063, 0, "yen"],
+  ["CNY", "Chinese yuan", "CN", "CN¥", 7.528947, 2, "yuan"],
+  ["SGD", "Singapore dollar", "SG", "S$", 1.435224, 2, "Singapore dollars"],
+  ["AUD", "Australian dollar", "AU", "A$", 1.610192, 2, "Australian dollars"],
+  ["BDT", "Bangladeshi taka", "BD", "৳", 137.994456, 2, "taka"],
+  ["BRL", "Brazilian real", "BR", "R$", 5.621931, 2, "reais"],
+  ["CAD", "Canadian dollar", "CA", "C$", 1.598569, 2, "Canadian dollars"],
+  ["CHF", "Swiss franc", "CH", "CHF ", 0.932089, 2, "Swiss francs"],
+  ["DKK", "Danish krone", "DK", "DKK ", 7.47432, 2, "kroner"],
+  ["EGP", "Egyptian pound", "EG", "EGP ", 58.741328, 2, "Egyptian pounds"],
+  ["HKD", "Hong Kong dollar", "HK", "HK$", 8.797878, 2, "Hong Kong dollars"],
+  ["IDR", "Indonesian rupiah", "ID", "Rp", 20041.230054, 0, "rupiah"],
+  ["ILS", "Israeli shekel", "IL", "₪", 3.424108, 2, "shekels"],
+  ["KRW", "South Korean won", "KR", "₩", 1506.55181, 0, "won"],
+  ["KWD", "Kuwaiti dinar", "KW", "KWD ", 0.345879, 3, "dinars"],
+  ["LKR", "Sri Lankan rupee", "LK", "LKR ", 370.108175, 2, "rupees"],
+  ["MXN", "Mexican peso", "MX", "MX$", 20.296664, 2, "pesos"],
+  ["MYR", "Malaysian ringgit", "MY", "RM", 4.581388, 2, "ringgit"],
+  ["NGN", "Nigerian naira", "NG", "₦", 1495.929551, 0, "naira"],
+  ["NOK", "Norwegian krone", "NO", "NOK ", 10.757844, 2, "kroner"],
+  ["NPR", "Nepalese rupee", "NP", "NPR ", 172.730747, 2, "rupees"],
+  ["NZD", "New Zealand dollar", "NZ", "NZ$", 2.003455, 2, "New Zealand dollars"],
+  ["PHP", "Philippine peso", "PH", "₱", 70.213959, 2, "pesos"],
+  ["PKR", "Pakistani rupee", "PK", "PKR ", 310.644678, 2, "rupees"],
+  ["PLN", "Polish zloty", "PL", "PLN ", 4.381665, 2, "zloty"],
+  ["QAR", "Qatari riyal", "QA", "QAR ", 4.081051, 2, "riyals"],
+  ["RUB", "Russian ruble", "RU", "₽", 95.487292, 2, "rubles"],
+  ["SAR", "Saudi riyal", "SA", "SAR ", 4.204379, 2, "riyals"],
+  ["SEK", "Swedish krona", "SE", "SEK ", 11.258839, 2, "kronor"],
+  ["THB", "Thai baht", "TH", "฿", 37.767319, 2, "baht"],
+  ["TRY", "Turkish lira", "TR", "₺", 55.130911, 2, "lira"],
+  ["TWD", "New Taiwan dollar", "TW", "NT$", 35.59386, 2, "Taiwan dollars"],
+  ["VND", "Vietnamese dong", "VN", "₫", 29116.488337, 0, "dong"],
+  ["ZAR", "South African rand", "ZA", "R", 18.671379, 2, "rand"],
+].map(([c, n, cc, s, r, d, w]) => ({ c, n, cc, s, r, d, w }));
+const POPULAR = ["EUR", "INR", "USD", "GBP", "AED", "JPY", "CNY", "SGD"];
+const flagOf = (cc) => cc.toUpperCase().replace(/./g, (ch) => String.fromCodePoint(127397 + ch.charCodeAt(0)));
+let CUR = CURRENCIES[0];
+try { const saved = localStorage.getItem("vh-cur"); const f = CURRENCIES.find((x) => x.c === saved); if (f) CUR = f; } catch (e) { /* storage blocked */ }
+
+function trimNum(x, dec) { return x.toLocaleString(CUR.c === "INR" ? "en-IN" : "en-GB", { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
+// Large amounts (input in EUR). axis=true gives a shorter label for chart axes.
+function money(vEur, axis = false) {
+  const v = vEur * CUR.r, a = Math.abs(v), sign = v < 0 ? "−" : "";
+  const dec = (n, fine) => (axis ? (n < 10 ? 1 : 0) : n < 1 ? 2 : fine && n < 10 ? 2 : n >= 1000 ? 0 : 1);
+  const out = (n, unit) => { let t = trimNum(n, dec(n, /Cr| L|T|B/.test(unit))); if (axis) t = t.replace(/\.0$/, ""); return `${sign}${CUR.s}${t}${unit}`; };
+  if (CUR.c === "INR") {
+    if (a >= 1e7) return out(a / 1e7, " Cr");
+    if (a >= 1e5) return out(a / 1e5, " L");
+    return `${sign}${CUR.s}${trimNum(a, 0)}`;
+  }
+  if (a >= 1e12) return out(a / 1e12, "T");
+  if (a >= 1e9) return out(a / 1e9, "B");
+  if (a >= 1e6) return out(a / 1e6, "M");
+  if (a >= 1e3) return out(a / 1e3, "K");
+  return `${sign}${CUR.s}${trimNum(a, 0)}`;
+}
+// Small amounts like the average ticket (input in EUR)
+function moneySmall(vEur, axis = false) {
+  const v = vEur * CUR.r;
+  return CUR.s + trimNum(v, axis ? Math.max(0, CUR.d - 1) : CUR.d);
+}
+// Rewrites money written by the server ("EUR 255.8M", "€163K", "to 261.5M") into the chosen currency
+function convertText(t) {
+  if (!t) return t;
+  const unit = (u) => (u === "M" ? 1e6 : u === "K" ? 1e3 : 1);
+  return t.replace(/(?:EUR ?|€)(\d[\d,]*(?:\.\d+)?)(M|K)?\b/g, (_, n, u) => money(parseFloat(n.replace(/,/g, "")) * unit(u)))
+          .replace(/(\bto )(\d[\d,]*(?:\.\d+)?)M\b/g, (_, pre, n) => pre + money(parseFloat(n.replace(/,/g, "")) * 1e6));
+}
+function renderFoot() {
+  const m = S.D.meta;
+  $("foot").innerHTML = `<b style="color:var(--ink)">Vantage Horizon</b> · Team Vantage (381) · Microsoft Innovate 2026 · Bennett University<br>Forecasts blend LightGBM (${(m.ensemble_weights.sales * 100).toFixed(0)}%) and SARIMAX; ranges come from past forecast errors. Targets are the same month last year +${(m.target_growth * 100).toFixed(0)}%. Data is synthetic, in the Kaggle Rossmann Store Sales format.${CUR.c !== "EUR" ? ` Amounts converted from euros to ${CUR.n} at 1 € = ${CUR.r.toLocaleString("en-GB", { maximumFractionDigits: 4 })} ${CUR.c} (rates of ${FX_DATE}).` : ""}`;
+}
+function setCurrency(code) {
+  const f = CURRENCIES.find((x) => x.c === code); if (!f) return;
+  CUR = f;
+  try { localStorage.setItem("vh-cur", code); } catch (e) { /* ignore */ }
+  $("cur-flag").textContent = flagOf(f.cc); $("cur-code").textContent = f.c;
+  $("cur-btn").title = f.c === "EUR" ? "Currency: Euro (data's original currency)" : `Currency: ${f.n} · 1 € = ${f.r.toLocaleString("en-GB", { maximumFractionDigits: 4 })} ${f.c}`;
+  if (S.D) { $("ask-ans").hidden = true; S.prevVals = {}; render(); renderFoot(); }
+}
+function setupCurrency() {
+  const pop = $("cur-pop"), btn = $("cur-btn"), list = $("cur-list"), q = $("cur-q");
+  $("cur-note").textContent = `Data is in euros. Other currencies use indicative exchange rates of ${FX_DATE}.`;
+  const row = (x) => `<button type="button" class="curopt" role="option" data-c="${x.c}" aria-selected="${x.c === CUR.c}"><span class="fl">${flagOf(x.cc)}</span><span class="cd">${x.c}</span><span class="nm">${esc(x.n)}</span><span class="rt">${x.c === "EUR" ? "base" : "1 € = " + x.r.toLocaleString("en-GB", { maximumFractionDigits: x.r >= 100 ? 0 : 2 })}</span></button>`;
+  const draw = () => {
+    const term = q.value.trim().toLowerCase();
+    if (term) {
+      const hits = CURRENCIES.filter((x) => (x.c + " " + x.n).toLowerCase().includes(term));
+      list.innerHTML = hits.length ? hits.map(row).join("") : `<div class="curgrp">No currency matches "${esc(q.value)}"</div>`;
+    } else {
+      const pop1 = POPULAR.map((c) => CURRENCIES.find((x) => x.c === c));
+      const rest = CURRENCIES.filter((x) => !POPULAR.includes(x.c)).sort((a, b) => a.n.localeCompare(b.n));
+      list.innerHTML = `<div class="curgrp">Popular</div>${pop1.map(row).join("")}<div class="curgrp">All currencies</div>${rest.map(row).join("")}`;
+    }
+  };
+  const open = () => { draw(); pop.hidden = false; btn.setAttribute("aria-expanded", "true"); q.value = ""; draw(); q.focus(); const sel = list.querySelector('[aria-selected="true"]'); if (sel) sel.scrollIntoView({ block: "nearest" }); };
+  const close = () => { pop.hidden = true; btn.setAttribute("aria-expanded", "false"); };
+  btn.onclick = (e) => { e.stopPropagation(); pop.hidden ? open() : close(); };
+  q.addEventListener("input", draw);
+  q.addEventListener("keydown", (e) => {
+    const opts = [...list.querySelectorAll(".curopt")]; if (!opts.length) return;
+    let i = opts.findIndex((o) => o.classList.contains("act"));
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault(); if (i >= 0) opts[i].classList.remove("act");
+      i = e.key === "ArrowDown" ? Math.min(opts.length - 1, i + 1) : Math.max(0, i - 1);
+      opts[i].classList.add("act"); opts[i].scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter") { e.preventDefault(); const o = opts[Math.max(0, i)]; setCurrency(o.dataset.c); close(); btn.focus(); }
+    else if (e.key === "Escape") { close(); btn.focus(); }
+  });
+  list.addEventListener("click", (e) => { const o = e.target.closest(".curopt"); if (!o) return; setCurrency(o.dataset.c); close(); btn.focus(); });
+  document.addEventListener("click", (e) => { if (!pop.hidden && !$("cur").contains(e.target)) close(); });
+  $("cur-flag").textContent = flagOf(CUR.cc); $("cur-code").textContent = CUR.c;
+}
+
+const METRIC_NAME = { sales: "Sales", customers: "Footfall (customers)", ticket: "Average ticket" };
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+async function load() {
+  if (EMBED) { S.D = EMBED; S.live = false; }
+  else {
+    try { const r = await fetch("/api/dashboard"); if (!r.ok) throw new Error(r.status); S.D = await r.json(); S.live = true; }
+    catch (e) { $("story-text").textContent = "Could not load the forecast. Run python run_pipeline.py, then start the API with uvicorn api.main:app."; return; }
+  }
+  setup(); render();
+}
+
+function lastMonth() { const a = S.D.actual_months; return a[a.length - 1]; }
+function viewMonth() { return S.view === 0 ? lastMonth() : S.D.future_months[S.view - 1]; }
+function fcFor(seg, metric, ym) { return S.D.series[seg][metric].forecast.find((f) => f.month === ym); }
+function actualFor(seg, metric, ym) { const i = S.D.actual_months.indexOf(ym); return i < 0 ? null : S.D.series[seg][metric].actual[i]; }
+function prevYm(ym, n = 1) { const d = new Date(ym + "-01T00:00:00"); d.setMonth(d.getMonth() - n); return d.toISOString().slice(0, 7); }
+
+function setup() {
+  const D = S.D, m = D.meta;
+  $("meta-line").textContent = `Retail sales forecast · synthetic data in Rossmann format · ${m.stores.toLocaleString("en-GB")} stores · ${m.daily_rows.toLocaleString("en-GB")} daily rows · actuals to ${new Date(m.as_of).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
+  const mc = $("mode-chip");
+  mc.className = "chip " + (S.live ? "good" : "");
+  mc.innerHTML = `<span class="dot"></span>${S.live ? "Live API" : "Snapshot"}`;
+  const gen = new Date(m.generated_at.replace(" UTC", "Z").replace(" ", "T"));
+  $("model-chip").textContent = `Forecast ${m.model_version} · updated ${isNaN(gen) ? m.generated_at : gen.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}`;
+  const views = [[lastMonth(), "Last month", "actual"], ...D.future_months.map((f, i) => [f, ["Next month", "+60 days", "+90 days"][i], "forecast"])];
+  $("view-seg").innerHTML = views.map((v, i) => `<button type="button" data-i="${i}" aria-pressed="${i === S.view}">${v[1]}<small>${MONY(v[0])} · ${v[2]}</small></button>`).join("");
+  $("view-seg").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; S.view = +b.dataset.i; S.animChart = true; render(); };
+  $("segment").innerHTML = D.segments.map((s) => `<option value="${s.id}">${s.label}</option>`).join("");
+  $("segment").onchange = (e) => { S.seg = e.target.value; S.animChart = true; resetWhatIf(); render(); };
+  $("metric-seg").innerHTML = ["sales", "customers", "ticket"].map((k) => `<button type="button" data-k="${k}" aria-pressed="${k === S.metric}">${{ sales: "Sales", customers: "Footfall", ticket: "Ticket" }[k]}</button>`).join("");
+  $("metric-seg").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; S.metric = b.dataset.k; S.animChart = true; render(); };
+  ["wi-promo", "wi-foot", "wi-ticket"].forEach((id) => $(id).addEventListener("input", whatIf));
+  $("wi-reset").onclick = () => { $("wi-promo").value = 0; $("wi-foot").value = 0; $("wi-ticket").value = 0; whatIf(); };
+  window.addEventListener("resize", () => drawChart());
+  setupAsk(); setupTeams(); setupHeatmap(); setupPro(); setupCool(); setupCurrency(); setupV2();
+  renderFoot();
+}
+
+function render() {
+  [...$("view-seg").children].forEach((b, i) => b.setAttribute("aria-pressed", i === S.view));
+  [...$("metric-seg").children].forEach((b) => b.setAttribute("aria-pressed", b.dataset.k === S.metric));
+  renderHero(); renderAction(); renderChain(); renderScenarioLab(); renderTrust();
+  renderStory(); renderTiles(); drawChart(); renderSegTable(); renderDrivers(); renderAlerts(); renderAccuracy(); renderHeatmap(); renderUTH(); renderWeather(); renderTakeaways();
+  const fut = S.view > 0;
+  $("wi-h").closest(".panel").hidden = !fut;
+  if (fut) whatIf();
+}
+
+function hitChip(p, target) {
+  if (p == null) return "";
+  const cls = p >= 0.6 ? "good" : p >= 0.4 ? "warn" : "crit";
+  const icon = p >= 0.6 ? "✓" : p >= 0.4 ? "!" : "✕";
+  return `<span class="chip ${cls}" title="Target ${fmt.sales(target)}">${icon} ${pctp(p)} chance to hit ${fmt.sales(target)}</span>`;
+}
+
+function renderStory() {
+  const D = S.D, ym = viewMonth(), seg = S.seg;
+  if (renderStoryV2()) return;
+  if (S.view > 0) {
+    const n = D.narratives[ym][seg];
+    $("story-text").textContent = convertText(n.text).replace(/ -(\d)/g, " −$1");
+    $("story-src").textContent = n.source === "template" ? "Summary written automatically from the forecast" : "Summary written by " + n.source;
+  } else {
+    const a = actualFor(seg, "sales", ym), p = actualFor(seg, "sales", prevYm(ym)), ly = actualFor(seg, "sales", prevYm(ym, 12));
+    const t = D.targets[seg][ym], bt = (D.series[seg].sales.backtest || []).find((b) => b.month === ym);
+    let s = `${MON(ym, "long")} closed at ${fmt.sales(a)} for ${D.segments.find((x) => x.id === seg).label.toLowerCase()}, ${pct((a / p - 1) * 100)} on ${MON(prevYm(ym), "long")}`;
+    if (ly) s += ` and ${pct((a / ly - 1) * 100)} on last year`;
+    s += ".";
+    if (t) s += ` That is ${Math.round((a / t) * 100)}% of the ${fmt.sales(t)} target.`;
+    if (bt) s += ` We had forecast ${fmt.sales(bt.forecast)} a month ahead (${pct((bt.forecast / bt.actual - 1) * 100)} error).`;
+    s += " Switch to Next month to act on it.";
+    $("story-text").textContent = s;
+    $("story-src").textContent = "Looking back: actuals from fct_monthly_kpi";
+  }
+}
+
+function renderTiles() {
+  const ym = viewMonth(), seg = S.seg, prev = S.view === 0 ? prevYm(ym) : lastMonth();
+  const html = ["sales", "customers", "ticket"].map((k) => {
+    const f = fmt[k];
+    if (S.view === 0) {
+      const a = actualFor(seg, k, ym), p = actualFor(seg, k, prev), ly = actualFor(seg, k, prevYm(ym, 12));
+      const d = (a / p - 1) * 100;
+      const t = k === "sales" ? S.D.targets[seg][ym] : null;
+      return `<div class="tile"><span class="eyebrow">${METRIC_NAME[k]} · ${MON(ym, "long")} actual</span>
+        <span class="val num" data-k="${k}" data-v="${a}">${f(a)}</span>
+        <div class="row"><span class="delta num ${d >= 0 ? "up" : "down"}">${d >= 0 ? "▲" : "▼"} ${pct(d)}</span><span class="range">vs ${MON(prev)}${ly ? ` · ${pct((a / ly - 1) * 100)} vs last year` : ""}</span></div>
+        ${t ? `<div class="row"><span class="chip ${a >= t ? "good" : "crit"}">${a >= t ? "✓ Target met" : "✕ Target missed"} · ${Math.round(a / t * 100)}% of ${f(t)}</span></div>` : ""}</div>`;
+    }
+    const fc = fcFor(seg, k, ym), a = actualFor(seg, k, prev), d = (fc.p50 / a - 1) * 100;
+    const t = k === "sales" ? S.D.targets[seg][ym] : null, p = k === "sales" ? S.D.p_hit[seg][ym] : null;
+    return `<div class="tile"><span class="eyebrow">${METRIC_NAME[k]} · ${MON(ym, "long")} forecast</span>
+      <span class="val fc num" data-k="${k}" data-v="${fc.p50}">${f(fc.p50)}</span>
+      <span class="range num">80% range ${f(fc.lo80)} – ${f(fc.hi80)} · 95% ${f(fc.lo95)} – ${f(fc.hi95)}</span>
+      <div class="row"><span class="delta num ${d >= 0 ? "up" : "down"}">${d >= 0 ? "▲" : "▼"} ${pct(d)}</span><span class="range">vs ${MON(prev)} actual</span></div>
+      ${t ? `<div class="row">${hitChip(p, t)}</div>` : ""}</div>`;
+  }).join("");
+  $("tiles").innerHTML = html;
+  $("tiles").querySelectorAll(".val").forEach((el) => {
+    const k = el.dataset.k, to = +el.dataset.v, from = S.prevVals[k];
+    S.prevVals[k] = to;
+    if (from == null || from === to || REDUCED) return;
+    const t0 = performance.now(), dur = 650;
+    const step = (now) => {
+      const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmt[k](from + (to - from) * e);
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+/* ---------- chart ---------- */
+function niceTicks(lo, hi, n = 6) {
+  const span = hi - lo, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => span / s <= n) || 10 * mag;
+  const t = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) t.push(v);
+  return t;
+}
+function drawChart() {
+  if (!S.D) return;
+  const D = S.D, seg = S.seg, k = S.metric, ser = D.series[seg][k];
+  const acts = D.actual_months.slice(-24), actVals = ser.actual.slice(-24);
+  const months = [...acts, ...D.future_months];
+  const fcs = ser.forecast;
+  const bt = (ser.backtest || []).filter((b) => acts.includes(b.month));
+  const targets = k === "sales" ? D.targets[seg] : {};
+  const box = $("chart"), W = Math.max(320, box.clientWidth), H = W < 520 ? 260 : 320;
+  const m = { l: 56, r: 14, t: 16, b: 30 };
+  const vals = [...actVals, ...fcs.flatMap((f) => [f.lo95, f.hi95]), ...bt.map((b) => b.forecast), ...months.map((x) => targets[x]).filter(Boolean)];
+  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+  const RT = k === "customers" ? 1 : CUR.r;
+  const ticks = niceTicks(lo * RT, hi * RT).map((t) => t / RT); lo = Math.min(lo, ticks[0]); hi = Math.max(hi, ticks[ticks.length - 1]);
+  const xw = (W - m.l - m.r) / months.length;
+  const X = (i) => m.l + xw * (i + 0.5), Y = (v) => m.t + (H - m.t - m.b) * (1 - (v - lo) / (hi - lo));
+  const nA = acts.length, sel = months.indexOf(viewMonth());
+  const lastIdx = nA - 1;
+  // band paths anchored at last actual
+  const band = (a, b) => {
+    const pts = [[lastIdx, actVals[lastIdx], actVals[lastIdx]], ...fcs.map((f, i) => [nA + i, f[a], f[b]])];
+    return "M" + pts.map((p) => `${X(p[0])},${Y(p[1])}`).join("L") + "L" + pts.reverse().map((p) => `${X(p[0])},${Y(p[2])}`).join("L") + "Z";
+  };
+  const fcLine = "M" + [[lastIdx, actVals[lastIdx]], ...fcs.map((f, i) => [nA + i, f.p50])].map((p) => `${X(p[0])},${Y(p[1])}`).join("L");
+  const actLine = "M" + actVals.map((v, i) => `${X(i)},${Y(v)}`).join("L");
+  const divX = X(lastIdx) + xw / 2;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${METRIC_NAME[k]} by month with forecast">`;
+  s += `<rect x="${divX}" y="${m.t}" width="${W - m.r - divX}" height="${H - m.t - m.b}" fill="var(--future-tint)"/>`;
+  if (sel >= 0) s += `<rect x="${X(sel) - xw / 2}" y="${m.t}" width="${xw}" height="${H - m.t - m.b}" fill="var(--surface-2)"/>`;
+  ticks.forEach((t) => { s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--grid)"/><text x="${m.l - 8}" y="${Y(t) + 4}" text-anchor="end">${axisFmt[k](t)}</text>`; });
+  months.forEach((mm, i) => {
+    const show = W < 560 ? (i % 3 === 0 || i >= nA) : (i % 2 === 0 || i >= nA);
+    if (show) s += `<text x="${X(i)}" y="${H - 10}" text-anchor="middle"${i === sel ? ' style="fill:var(--ink);font-weight:600"' : ""}>${MON(mm)}${mm.endsWith("-01") ? " " + mm.slice(2, 4) : ""}</text>`;
+  });
+  s += `<line x1="${divX}" x2="${divX}" y1="${m.t}" y2="${H - m.b}" stroke="var(--muted)" stroke-dasharray="3 3"/>`;
+  s += `<text x="${divX + 6}" y="${m.t + 12}" style="fill:var(--ink-2)">As of ${new Date(D.meta.as_of).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} →</text>`;
+  s += `<defs><clipPath id="futclip"><rect id="futrect" x="0" y="0" width="${S.animChart && !REDUCED ? divX : W}" height="${H}"/></clipPath></defs><g clip-path="url(#futclip)">`;
+  s += `<path d="${band("lo95", "hi95")}" fill="var(--band95)"/><path d="${band("lo80", "hi80")}" fill="var(--band80)"/>`;
+  s += `<path d="${actLine}" fill="none" stroke="var(--actual)" stroke-width="2" stroke-linejoin="round"/>`;
+  s += `<path d="${fcLine}" fill="none" stroke="var(--fc)" stroke-width="2" stroke-dasharray="5 4"/>`;
+  fcs.forEach((f, i) => { s += `<circle cx="${X(nA + i)}" cy="${Y(f.p50)}" r="${nA + i === sel ? 5.5 : 4}" fill="var(--fc)" stroke="var(--surface)" stroke-width="2"/>`; });
+  s += `</g>`;
+  months.forEach((mm, i) => { const t = targets[mm]; if (t && i >= nA - 6) s += `<line x1="${X(i) - xw * 0.32}" x2="${X(i) + xw * 0.32}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--warn)" stroke-width="2"/>`; });
+  bt.forEach((b) => { const i = acts.indexOf(b.month); s += `<circle cx="${X(i)}" cy="${Y(b.forecast)}" r="4" fill="var(--surface)" stroke="var(--fc)" stroke-width="2"/>`; });
+  s += `<circle cx="${X(lastIdx)}" cy="${Y(actVals[lastIdx])}" r="4" fill="var(--actual)" stroke="var(--surface)" stroke-width="2"/>`;
+  s += `<line id="cross" x1="0" x2="0" y1="${m.t}" y2="${H - m.b}" stroke="var(--ink-2)" stroke-width="1" opacity="0"/>`;
+  s += `<rect id="hit" x="${m.l}" y="${m.t}" width="${W - m.l - m.r}" height="${H - m.t - m.b}" fill="transparent"/>`;
+  s += `</svg><div class="tip" id="tip" hidden></div>`;
+  box.innerHTML = s;
+  if (S.animChart && !REDUCED) {
+    const r = box.querySelector("#futrect"), t0 = performance.now(), dur = 900;
+    const step = (now) => { const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3); r.setAttribute("width", divX + (W - divX) * e); if (p < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }
+  S.animChart = false;
+  $("chart-h").textContent = `Monthly ${METRIC_NAME[k].toLowerCase()}`;
+  $("chart-sub").textContent = `${D.segments.find((x) => x.id === seg).label} · 24 months of actuals, then the next 90 days with uncertainty bands`;
+  $("lg-target").hidden = k !== "sales";
+  const hit = box.querySelector("#hit"), cross = box.querySelector("#cross"), tip = $("tip");
+  const move = (ev) => {
+    const r = hit.getBoundingClientRect(), sx = W / box.querySelector("svg").getBoundingClientRect().width;
+    const x = (ev.clientX - r.left) * sx + m.l; const i = Math.max(0, Math.min(months.length - 1, Math.floor((x - m.l) / xw)));
+    cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("opacity", ".5");
+    const mm = months[i], f = fcs.find((z) => z.month === mm), b = bt.find((z) => z.month === mm), t = targets[mm];
+    let h = `<b>${MONY(mm)}</b>`;
+    if (i < nA) h += `<div class="r"><span>Actual</span><span>${fmt[k](actVals[i])}</span></div>`;
+    if (b) h += `<div class="r"><span>Forecast made 1 month earlier</span><span>${fmt[k](b.forecast)}</span></div><div class="r"><span>Error</span><span>${pct((b.forecast / b.actual - 1) * 100)}</span></div>`;
+    if (f) h += `<div class="r"><span>Forecast</span><span>${fmt[k](f.p50)}</span></div><div class="r"><span>80% range</span><span>${fmt[k](f.lo80)}–${fmt[k](f.hi80)}</span></div><div class="r"><span>95% range</span><span>${fmt[k](f.lo95)}–${fmt[k](f.hi95)}</span></div>`;
+    if (t) h += `<div class="r"><span>Target</span><span>${fmt.sales(t)}</span></div>`;
+    tip.innerHTML = h; tip.hidden = false;
+    const bw = box.clientWidth, px = X(i) / sx;
+    tip.style.left = Math.min(bw - tip.offsetWidth - 4, Math.max(4, px + 12)) + "px";
+    tip.style.top = "10px";
+  };
+  hit.addEventListener("pointermove", move);
+  hit.addEventListener("pointerleave", () => { tip.hidden = true; cross.setAttribute("opacity", "0"); });
+  hit.addEventListener("click", (ev) => { const i = months.indexOf(months[Math.floor(((ev.offsetX * W / box.clientWidth) - m.l) / xw)]); const v = i === lastIdx ? 0 : i >= nA ? i - nA + 1 : null; if (v != null) { S.view = v; render(); } });
+}
+
+/* ---------- segment table ---------- */
+function renderSegTable() {
+  const D = S.D, ym = viewMonth(), last = lastMonth();
+  let head, rows;
+  if (S.view === 0) {
+    $("seg-sub").textContent = `${MON(ym, "long")} actuals against target. Click a row to filter.`;
+    head = ["Stores", `${MON(ym)} actual`, `vs ${MON(prevYm(ym))}`, "vs last year", "Target", "Status"];
+    rows = D.segments.map((s) => {
+      const a = actualFor(s.id, "sales", ym), p = actualFor(s.id, "sales", prevYm(ym)), ly = actualFor(s.id, "sales", prevYm(ym, 12)), t = D.targets[s.id][ym];
+      const ok = t && a >= t;
+      return [s, [fmt.sales(a), pct((a / p - 1) * 100), ly ? pct((a / ly - 1) * 100) : "–", t ? fmt.sales(t) : "–", t ? `<span class="chip ${ok ? "good" : "crit"}">${ok ? "✓ Met" : "✕ Missed"}</span>` : ""]];
+    });
+  } else {
+    $("seg-sub").textContent = `${MON(ym, "long")} forecast against ${MON(last, "long")} actual. Click a row to filter.`;
+    head = ["Stores", `${MON(last)} actual`, `${MON(ym)} forecast`, "Change", "80% range", "Target odds"];
+    rows = D.segments.map((s) => {
+      const a = actualFor(s.id, "sales", last), f = fcFor(s.id, "sales", ym), p = D.p_hit[s.id][ym];
+      const cls = p == null ? "" : p >= 0.6 ? "good" : p >= 0.4 ? "warn" : "crit";
+      return [s, [fmt.sales(a), fmt.sales(f.p50), pct((f.p50 / a - 1) * 100), `${fmt.sales(f.lo80)}–${fmt.sales(f.hi80)}`, p == null ? "–" : `<span class="chip ${cls}">${p >= 0.6 ? "✓" : p >= 0.4 ? "!" : "✕"} ${Math.round(p * 100)}%</span>`]];
+    });
+  }
+  $("seg-table").innerHTML = `<thead><tr>${head.map((h) => `<th scope="col">${h}</th>`).join("")}</tr></thead><tbody>` +
+    rows.map(([s, c]) => `<tr data-s="${s.id}" class="${s.id === S.seg ? "sel" : ""}" tabindex="0"><td>${s.label}</td>${c.map((x) => `<td>${x}</td>`).join("")}</tr>`).join("") + "</tbody>";
+  $("seg-table").querySelectorAll("tbody tr").forEach((tr) => {
+    const go = () => { S.seg = tr.dataset.s; $("segment").value = S.seg; render(); };
+    tr.onclick = go; tr.onkeydown = (e) => { if (e.key === "Enter") go(); };
+  });
+}
+
+/* ---------- drivers ---------- */
+function renderDrivers() {
+  const D = S.D, seg = S.seg;
+  if (S.view === 0) {
+    $("drv-h").textContent = "What moves sales";
+    $("drv-sub").textContent = "Average impact of each driver on a store-day (SHAP, LightGBM). Switch to a forecast month to see why it differs.";
+    const g = D.global_importance.slice(0, 7), max = g[0].value;
+    $("drivers").innerHTML = g.map((d) => `<div class="drv"><span class="name">${esc(d.name)}</span><span class="pct">±${(d.value * 100).toFixed(1)}%</span><div class="bar"><span style="left:50%;width:${(d.value / max) * 48}%;background:var(--pos)"></span></div></div>`).join("");
+    return;
+  }
+  const ym = viewMonth(), x = D.drivers[ym][seg];
+  $("drv-h").textContent = `Why ${MON(ym, "long")} is different`;
+  $("drv-sub").textContent = `Change vs ${MON(lastMonth(), "long")} actual, split into its top five drivers (SHAP + calendar).`;
+  const items = [...x.drivers, { name: "Everything else", pct: x.other_pct }];
+  const max = Math.max(...items.map((d) => Math.abs(d.pct)), 1);
+  $("drivers").innerHTML = items.map((d) => {
+    const w = (Math.abs(d.pct) / max) * 48, pos = d.pct >= 0;
+    return `<div class="drv"><span class="name">${esc(drvName(d.name))}</span><span class="pct">${pct(d.pct)}</span><div class="bar"><span class="${pos ? "" : "neg"}" style="${pos ? "left:50%" : `left:${50 - w}%`};width:${w}%;background:var(${pos ? "--pos" : "--neg"})"></span></div></div>`;
+  }).join("") + `<div class="total"><span>Total change</span><span class="num">${pct(x.total_pct)}</span></div>`;
+}
+
+/* ---------- alerts ---------- */
+function renderAlerts() {
+  const D = S.D, seg = S.seg;
+  const list = D.alerts.filter((a) => seg === "All" || a.segment === seg || a.segment === "All");
+  $("al-sub").textContent = list.length ? `${list.length} open · sent to Teams as an Adaptive Card` : "Nothing flagged";
+  $("alerts").innerHTML = list.length ? list.map((a) => {
+    let extra = "";
+    if (a.weeks) extra += `<div class="spark" title="Weekly footfall vs expected">${a.weeks.map((w) => `<span class="${w.z <= -2.5 ? "" : "ok"}" style="height:${Math.min(100, Math.abs(w.resid_pct) * 9)}%" title="${w.week}: ${pct(w.resid_pct)} (z ${w.z.toFixed(1)})"></span>`).join("")}</div><div class="d">Weeks of ${a.weeks.map((w) => w.week).join(", ")}. Hardest hit: ${a.worst_stores.map((s) => `#${s.store} (${pct(s.gap_pct, 0)})`).join(", ")}</div>`;
+    return `<div class="alert ${a.severity}"><span class="chip ${a.severity === "critical" ? "crit" : "warn"}" style="justify-self:start">${a.severity === "critical" ? "✕ Critical" : "! Warning"} · ${a.kind === "leading_indicator" ? "Leading indicator" : "Target risk"}</span><span class="t">${esc(a.title)}</span><span class="d">${esc(convertText(a.detail))}</span>${extra}</div>`;
+  }).join("") : `<p class="sub">No anomalies in leading indicators and every forecast is on track for target.</p>`;
+}
+
+/* ---------- accuracy ---------- */
+function renderAccuracy() {
+  const D = S.D, acc = D.accuracy, maxV = Math.max(...acc.map((a) => a.mape_total), D.meta.target_mape) * 1.1;
+  $("acc-sub").textContent = `Average error of one-month-ahead forecasts over the last ${D.series.All.sales.backtest.length} months (all stores), scored out-of-sample. Red line = ${D.meta.target_mape}% goal.`;
+  const best = Math.min(...acc.map((a) => a.mape_total));
+  $("acc").innerHTML = acc.map((a) => `<div class="row ${a.mape_total === best ? "best" : ""}"><span>${esc(a.model)}</span><div class="track"><span style="width:${(a.mape_total / maxV) * 100}%"></span><i style="left:${(D.meta.target_mape / maxV) * 100}%"></i></div><span class="v">${a.mape_total.toFixed(1)}%</span></div>`).join("");
+  const bt = D.series[S.seg].sales.backtest || [];
+  const hasP = bt.length && bt[0].prophet != null;
+  $("bt-table").innerHTML = `<thead><tr><th scope="col">Month (${D.segments.find((x) => x.id === S.seg).label})</th><th scope="col">Forecast</th><th scope="col">Actual</th><th scope="col">Error</th><th scope="col">In 80% range</th>${hasP ? `<th scope="col">Prophet error</th>` : ""}<th scope="col">ETS error</th></tr></thead><tbody>` +
+    bt.map((b) => `<tr><td>${MONY(b.month)}</td><td>${fmt.sales(b.forecast)}</td><td>${fmt.sales(b.actual)}</td><td>${pct((b.forecast / b.actual - 1) * 100)}</td><td>${b.lo80 != null ? (b.actual >= b.lo80 && b.actual <= b.hi80 ? "✓ yes" : "✕ no") : "–"}</td>${hasP ? `<td>${pct((b.prophet / b.actual - 1) * 100)}</td>` : ""}<td>${pct((b.ets / b.actual - 1) * 100)}</td></tr>`).join("") + "</tbody>";
+}
+
+/* ---------- what-if ---------- */
+function normCdf(x) { const t = 1 / (1 + 0.2316419 * Math.abs(x)), d = 0.3989423 * Math.exp(-x * x / 2); const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return x > 0 ? 1 - p : p; }
+function whatIf() {
+  if (S.view === 0) return;
+  const D = S.D, ym = viewMonth(), seg = S.seg, f = fcFor(seg, "sales", ym);
+  const dp = +$("wi-promo").value, ff = +$("wi-foot").value, tk = +$("wi-ticket").value;
+  const w = D.whatif[ym], base = w.base_promo_days;
+  $("wi-promo-v").textContent = `${base + dp} days (${dp >= 0 ? "+" : ""}${dp})`;
+  $("wi-foot-v").textContent = pct(ff);
+  $("wi-ticket-v").textContent = pct(tk);
+  $("wi-sub").textContent = `${MON(ym, "long")} · ${D.segments.find((x) => x.id === seg).label} · ${S.live ? "re-scores the daily model via the API" : "uses the model's promo response curve"}`;
+  const c = w.curve[seg], ratio = c.sales[c.delta.indexOf(dp)] * (1 + ff / 100) * (1 + tk / 100);
+  showWhatIf(f, f.p50 * ratio, ratio, D.targets[seg][ym], "curve");
+  if (S.live) {
+    clearTimeout(S.wiTimer);
+    const seq = (S.wiSeq = (S.wiSeq || 0) + 1);
+    S.wiTimer = setTimeout(async () => {
+      try {
+        const r = await fetch("/api/whatif", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ month: ym, segment: seg, promo_delta: dp, footfall_pct: ff, ticket_pct: tk }) });
+        if (!r.ok) return; const j = await r.json();
+        if (seq === S.wiSeq && viewMonth() === ym && S.seg === seg) showWhatIf(f, j.p50, j.ratio, j.target, "api");
+      } catch (e) { /* keep the curve estimate */ }
+    }, 250);
+  }
+}
+function showWhatIf(f, p50, ratio, target, src) {
+  const sd = Math.log(f.hi80 / f.p50) / 1.2816;
+  const p = target ? 1 - normCdf((Math.log(target) - Math.log(p50)) / sd) : null;
+  const p0 = target ? 1 - normCdf((Math.log(target) - Math.log(f.p50)) / sd) : null;
+  const d = (ratio - 1) * 100;
+  if (p != null) { const key = `${viewMonth()}|${S.seg}`; if (S.oddsKey === key && S.lastOdds < 0.6 && p >= 0.6) celebrate(); S.oddsKey = key; S.lastOdds = p; }
+  const dp = +$("wi-promo").value, ff = +$("wi-foot").value, tk = +$("wi-ticket").value;
+  const lev = [dp ? `<b>${Math.abs(dp)} ${dp > 0 ? "extra" : "fewer"} promo day${Math.abs(dp) === 1 ? "" : "s"}</b>` : "", ff ? `footfall <b>${pct(ff)}</b>` : "", tk ? `average ticket <b>${pct(tk)}</b>` : ""].filter(Boolean);
+  $("tk-wi").innerHTML = !lev.length ? "Move a slider to test a decision before you make it. Try adding promo days." :
+    `With ${lev.join(" and ")}, sales ${p50 >= f.p50 ? "rise" : "fall"} by <b>${money(Math.abs(p50 - f.p50))}</b>` + (target ? ` and the chance of hitting target ${p >= p0 ? "rises" : "falls"} from <b>${Math.round(p0 * 100)}%</b> to <b>${Math.round(p * 100)}%</b>.` : ".");
+  $("wi-out").innerHTML = `<span class="eyebrow">Scenario sales</span><span class="big">${fmt.sales(p50)}</span>
+    <span class="num" style="font-size:12.5px;color:var(--ink-2)">${pct(d)} vs forecast ${fmt.sales(f.p50)} · ${d >= 0 ? "+" : "−"}${money(Math.abs(p50 - f.p50))}</span>
+    ${target ? `<div class="row" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">${hitChip(p, target)}<span class="chip">was ${Math.round(p0 * 100)}%</span></div>` : ""}
+    <span style="font-size:11px;color:var(--muted)">${src === "api" ? "Exact re-score from /api/whatif" : "Estimated from the promo response curve"}</span>`;
+}
+
+/* ---------- shared helpers ---------- */
+const DRV_NAME = { "SARIMAX cross-check": "Monthly trend model", "Last month's deviation": "Last month's momentum" };
+const drvName = (n) => DRV_NAME[n] || n;
+function segLabel(id) { return S.D.segments.find((x) => x.id === id).label; }
+function segName(id) { return id === "All" ? "all stores" : segLabel(id); }
+const fmtStore = (v) => money(v);
+function flashPanel(el) {
+  if (!el) return;
+  el.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "center" });
+  el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+}
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function hexRgb(h) { h = h.replace("#", ""); if (h.length === 3) h = h.split("").map((c) => c + c).join(""); const n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function mix(a, b, t) { const x = hexRgb(a), y = hexRgb(b); return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(",")})`; }
+
+/* ---------- Ask Vantage ---------- */
+const ASK_EXAMPLES = [
+  "Will store type D hit target in November?",
+  "Why is October different?",
+  "Add 3 promo days for type D",
+  "What are the risks?",
+  "Footfall forecast for December",
+  "How accurate is the forecast?",
+  "Show store 707",
+];
+function setupAsk() {
+  $("ask-ex").innerHTML = ASK_EXAMPLES.map((q) => `<button type="button">${esc(q)}</button>`).join("");
+  $("ask-ex").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; $("ask-q").value = b.textContent; answer(b.textContent); };
+  $("ask-form").addEventListener("submit", (e) => { e.preventDefault(); const q = $("ask-q").value.trim(); if (q) answer(q); });
+}
+function parseQ(raw) {
+  const q = " " + raw.toLowerCase().replace(/[?!,]/g, " ") + " ";
+  const out = { intent: "forecast" };
+  let m;
+  if ((m = q.match(/store\s*(?:no\.?|number|#)?\s*#?(\d{1,4})\b/)) && !/store\s*type/.test(q)) out.store = +m[1];
+  if ((m = q.match(/type\s*([abcd])\b/))) out.seg = m[1];
+  else if (/\b(all stores|overall|total|chain|company)\b/.test(q)) out.seg = "All";
+  if (/\b(last month|september|sept|sep)\b/.test(q)) out.view = 0;
+  else if (/\b(december|dec|christmas|90 days|\+90)\b/.test(q)) out.view = 3;
+  else if (/\b(november|nov|60 days|\+60)\b/.test(q)) out.view = 2;
+  else if (/\b(next month|october|oct)\b/.test(q)) out.view = 1;
+  if (/footfall|customer|visitor|traffic/.test(q)) out.metric = "customers";
+  else if (/ticket|basket|spend per/.test(q)) out.metric = "ticket";
+  else if (/sales|revenue/.test(q)) out.metric = "sales";
+  const wi = {};
+  if ((m = q.match(/(?:add|more|extra|plus|\+)\s*(\d+)\s*(?:more\s*|extra\s*)?promo/)) || (m = q.match(/(\d+)\s*(?:more|extra|additional)\s*promo/))) wi.promo = +m[1];
+  if ((m = q.match(/(?:remove|cut|fewer|less|drop|minus|-)\s*(\d+)\s*promo/)) || (m = q.match(/(\d+)\s*(?:fewer|less)\s*promo/))) wi.promo = -m[1];
+  const lever = (word) => {
+    const r = new RegExp(word + "[a-z ]*?(up|down|rises?|falls?|drops?|increases?|decreases?|grows?|\\+|-)\\s*(?:by\\s*)?(\\d+(?:\\.\\d+)?)\\s*%");
+    const x = q.match(r); if (!x) return null;
+    return (/(down|fall|drop|decrease|-)/.test(x[1]) ? -1 : 1) * +x[2];
+  };
+  const ff = lever("(?:footfall|customers|visitors)"); if (ff != null) wi.foot = ff;
+  const tk = lever("(?:ticket|basket)"); if (tk != null) wi.ticket = tk;
+  if (Object.keys(wi).length) { out.intent = "whatif"; out.wi = wi; }
+  else if (out.store) out.intent = "store";
+  else if (/\bwhy\b|driver|reason|explain/.test(q)) out.intent = "why";
+  else if (/risk|alert|warning|problem|worr|concern|anomal/.test(q)) out.intent = "risk";
+  else if (/accura|trust|error|mape|backtest|reliab/.test(q)) out.intent = "accuracy";
+  else if (/target|odds|chance|hit|likely|probab/.test(q)) out.intent = "target";
+  out.understood = !!(out.store || out.seg || out.view != null || out.metric || out.intent !== "forecast" || /forecast|predict|expect|will|next|outlook/.test(q));
+  return out;
+}
+function answer(raw) {
+  const D = S.D, p = parseQ(raw), box = $("ask-ans");
+  let text = "", target = null;
+  if (!p.understood) {
+    box.hidden = false;
+    box.innerHTML = `I can answer about sales, footfall or average ticket by month and store type, the drivers, early warnings, accuracy, single stores, and what-ifs on promo days, footfall or ticket. Try one of the examples.<small>Rule-based question parser. With Azure OpenAI keys set, GPT-4o interprets free-form questions.</small>`;
+    return;
+  }
+  if (p.seg) { S.seg = p.seg; $("segment").value = p.seg; }
+  if (p.metric) S.metric = p.metric;
+  if (p.view != null) S.view = p.view;
+  if (p.intent === "whatif" && S.view === 0) S.view = 1;
+  if (["why", "target"].includes(p.intent) && S.view === 0 && p.view == null) S.view = 1;
+  S.animChart = true;
+  const seg = S.seg, segL = segName(seg);
+  const ym = () => viewMonth();
+
+  if (p.intent === "store") {
+    const r = (D.stores && D.stores.rows || []).find((x) => x.id === p.store);
+    render();
+    if (!r) text = `There is no store #${p.store}. Stores are numbered 1 to ${D.stores ? D.stores.rows.length : 1115}.`;
+    else {
+      selectStore(r.id); target = $("hm-panel");
+      const pctT = r.target ? (r.fc / r.target) * 100 : null;
+      text = `Store #${r.id} (${segLabel(r.type)}): ${MON(D.stores.last_month, "long")} footfall was ${pct(r.foot_gap)} vs what we expected. ${MON(D.stores.month, "long")} sales forecast ${fmtStore(r.fc)}${pctT ? `, ${Math.round(pctT)}% of its ${fmtStore(r.target)} target` : ""}.`;
+    }
+  } else if (p.intent === "whatif") {
+    render();
+    const w = p.wi;
+    $("wi-promo").value = Math.max(-6, Math.min(6, w.promo || 0));
+    $("wi-foot").value = Math.max(-15, Math.min(15, w.foot || 0));
+    $("wi-ticket").value = Math.max(-10, Math.min(10, w.ticket || 0));
+    whatIf();
+    const f = fcFor(seg, "sales", ym()), c = D.whatif[ym()].curve[seg], dp = +$("wi-promo").value;
+    const ratio = c.sales[c.delta.indexOf(dp)] * (1 + +$("wi-foot").value / 100) * (1 + +$("wi-ticket").value / 100);
+    const t = D.targets[seg][ym()], sd = Math.log(f.hi80 / f.p50) / 1.2816;
+    const odds = (v) => Math.round((1 - normCdf((Math.log(t) - Math.log(v)) / sd)) * 100);
+    const parts = [];
+    if (dp) parts.push(`${dp > 0 ? "+" : ""}${dp} promo days`);
+    if (+$("wi-foot").value) parts.push(`footfall ${pct(+$("wi-foot").value)}`);
+    if (+$("wi-ticket").value) parts.push(`ticket ${pct(+$("wi-ticket").value)}`);
+    text = `With ${parts.join(", ")} in ${MON(ym(), "long")}, ${segL} sales would be about ${fmt.sales(f.p50 * ratio)} (${pct((ratio - 1) * 100)} vs forecast).` + (t ? ` Chance of hitting target moves from ${odds(f.p50)}% to ${odds(f.p50 * ratio)}%.` : "");
+    target = $("wi-h").closest(".panel");
+  } else if (p.intent === "why") {
+    render();
+    const x = D.drivers[ym()][seg];
+    text = `${MON(ym(), "long")} sales for ${segL} are ${pct(x.total_pct)} vs ${MON(lastMonth(), "long")}. Biggest drivers: ${x.drivers.slice(0, 3).map((d) => `${drvName(d.name)} ${pct(d.pct)}`).join(", ")}.`;
+    target = $("drv-h").closest(".panel");
+  } else if (p.intent === "risk") {
+    render();
+    const list = D.alerts.filter((a) => seg === "All" || a.segment === seg || a.segment === "All");
+    text = list.length ? `${list.length} open warning${list.length > 1 ? "s" : ""}: ${list.slice(0, 3).map((a) => a.title).join("; ")}.` : `No warnings for ${segL}.`;
+    target = $("al-h").closest(".panel");
+  } else if (p.intent === "accuracy") {
+    render();
+    const a = D.accuracy;
+    text = `Over the last ${D.series.All.sales.backtest.length} months, our one-month-ahead forecast was off by ${a[0].mape_total.toFixed(1)}% on average, against ${a.find((x) => x.model.startsWith("ETS")).mape_total.toFixed(1)}% for ETS (Power BI's built-in method). Our target is ${D.meta.target_mape}% or less. These figures come from synthetic data.`;
+    target = $("acc-h").closest(".panel");
+  } else {
+    render();
+    const k = S.metric, v = ym();
+    if (S.view === 0) {
+      const a = actualFor(seg, k, v), t = k === "sales" ? D.targets[seg][v] : null;
+      text = `${METRIC_NAME[k]} for ${segL} in ${MON(v, "long")} was ${fmt[k](a)}` + (t ? `, ${Math.round((a / t) * 100)}% of target.` : ".");
+    } else {
+      const f = fcFor(seg, k, v), ph = k === "sales" ? D.p_hit[seg][v] : null, t = k === "sales" ? D.targets[seg][v] : null;
+      text = `${METRIC_NAME[k]} forecast for ${segL} in ${MON(v, "long")}: ${fmt[k](f.p50)}, likely between ${fmt[k](f.lo80)} and ${fmt[k](f.hi80)}.` +
+        (ph != null ? ` ${Math.round(ph * 100)}% chance of reaching the ${fmt.sales(t)} target${ph < 0.4 ? ", so it is at risk" : ph >= 0.6 ? ", so it is on track" : ", a toss-up"}.` : "");
+    }
+    target = $("tiles");
+  }
+  box.hidden = false;
+  box.innerHTML = `${esc(text)}<small>Answered from the forecast tables by a rule-based question parser. With Azure OpenAI keys set, GPT-4o interprets free-form questions.</small>`;
+  flashPanel(target);
+}
+
+/* ---------- Teams preview ---------- */
+function teamsCard() {
+  const D = S.D, head = D.narratives[D.future_months[0]].All.text;
+  const body = [
+    { type: "TextBlock", text: "Vantage Horizon early warning", weight: "Bolder", size: "Medium" },
+    { type: "TextBlock", text: head, wrap: true },
+    { type: "TextBlock", text: `Data as of ${D.meta.as_of}`, isSubtle: true, spacing: "None", size: "Small" },
+  ];
+  D.alerts.slice(0, 5).forEach((a) => body.push({ type: "Container", style: a.severity === "critical" ? "attention" : "warning", items: [
+    { type: "TextBlock", text: `${a.severity.toUpperCase()} · ${a.title}`, weight: "Bolder", wrap: true },
+    { type: "TextBlock", text: a.detail, wrap: true, size: "Small" }] }));
+  return { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.4", body };
+}
+function setupTeams() {
+  const modal = $("teams-modal");
+  let opener = null;
+  const close = () => { modal.hidden = true; if (opener) opener.focus(); };
+  $("teams-btn").onclick = (e) => {
+    opener = e.currentTarget;
+    const D = S.D, card = teamsCard();
+    card.body.forEach((b) => { if (b.text) b.text = convertText(b.text); (b.items || []).forEach((it) => (it.text = convertText(it.text))); });
+    const blocks = card.body.map((b) => b.type === "TextBlock"
+      ? (b.weight === "Bolder" ? `<div class="h">${esc(b.text)}</div>` : `<div style="font-size:${b.size === "Small" ? "12px;color:var(--muted)" : "13.5px"}">${esc(b.text)}</div>`)
+      : `<div class="c ${b.style === "attention" ? "critical" : "warning"}"><b>${esc(b.items[0].text)}</b>${esc(b.items[1].text)}</div>`).join("");
+    $("teams-body").innerHTML = `<div class="teams-msg"><div class="teams-av"><svg width="18" height="18" viewBox="0 0 36 36" aria-hidden="true"><path d="M6 24 L13 19 L18 21 L23 15" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M23 15 L30 9" stroke="#fff" stroke-width="3" stroke-dasharray="2.5 2.5" fill="none"/></svg></div>
+      <div style="display:grid;gap:6px;min-width:0"><div class="teams-meta"><b>Vantage Horizon</b>Bot · ${esc(D.meta.generated_at)}</div><div class="acard">${blocks}</div></div></div>
+      <div class="teams-foot"><span>${D.alerts.length} alerts · ${/skipped/.test(D.meta.teams) ? "Ready to send · connect a Teams channel webhook to post" : esc(D.meta.teams)}</span><button class="btn" type="button" id="teams-copy">Copy card JSON</button></div>`;
+    $("teams-copy").onclick = async (ev) => {
+      const txt = JSON.stringify(card, null, 2), btn = ev.currentTarget;
+      try { await navigator.clipboard.writeText(txt); btn.textContent = "Copied"; }
+      catch (err) { btn.textContent = "Copy failed"; }
+    };
+    modal.hidden = false;
+    $("teams-x").focus();
+  };
+  $("teams-x").onclick = close;
+  modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !modal.hidden) close(); });
+}
+
+/* ---------- Store heatmap ---------- */
+function hmValue(r) { return S.hmMode === "foot" ? r.foot_gap : (r.target ? (r.fc / r.target - 1) * 100 : null); }
+function setupHeatmap() {
+  if (!S.D.stores) { $("hm-panel").hidden = true; return; }
+  const st = S.D.stores;
+  $("hm-seg").innerHTML = [["foot", `${MON(st.last_month)} footfall`], ["target", `${MON(st.month)} vs target`]].map(([k, l]) => `<button type="button" data-k="${k}" aria-pressed="${k === S.hmMode}">${l}</button>`).join("");
+  $("hm-seg").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; S.hmMode = b.dataset.k; renderHeatmap(); renderTakeaways(); };
+  $("hm").addEventListener("click", (e) => { const i = e.target.closest("i[data-id]"); if (i) selectStore(+i.dataset.id); });
+  $("hm-store").addEventListener("change", (e) => { const id = +e.target.value; if (id) selectStore(id); });
+}
+function renderHeatmap() {
+  const D = S.D; if (!D.stores) return;
+  const st = D.stores, R = 12;
+  [...$("hm-seg").children].forEach((b) => b.setAttribute("aria-pressed", b.dataset.k === S.hmMode));
+  const neg = css("--neg"), pos = css("--pos"), mid = mix(css("--surface-2"), css("--muted"), 0.25);
+  const color = (v) => v == null ? "transparent" : v < 0 ? mix(mid.startsWith("rgb") ? rgbHex(mid) : mid, neg, Math.min(1, -v / R)) : mix(rgbHex(mid), pos, Math.min(1, v / R));
+  const types = S.seg === "All" ? ["a", "b", "c", "d"] : [S.seg];
+  $("hm-sub").textContent = S.hmMode === "foot"
+    ? `${MON(st.last_month, "long")} footfall at each of ${st.rows.length.toLocaleString("en-GB")} stores vs what the model expected a month earlier. Red means fewer visitors than expected: the leading indicator behind the early warning.`
+    : `${MON(st.month, "long")} sales forecast for each store as a share of its target (same month last year +${(D.meta.target_growth * 100).toFixed(0)}%). Store forecasts add up to their store type's forecast.`;
+  $("hm-legend").innerHTML = `<span>${S.hmMode === "foot" ? "Fewer visitors" : "Below target"} −${R}%</span><span class="grad" style="background:linear-gradient(90deg, ${neg}, ${mid}, ${pos})"></span><span>+${R}% ${S.hmMode === "foot" ? "more visitors" : "above target"}</span><span>· click a square for the store</span>`;
+  $("hm").innerHTML = types.map((t) => {
+    const rows = st.rows.filter((r) => r.type === t).map((r) => [r, hmValue(r)]).sort((a, b) => (a[1] ?? 0) - (b[1] ?? 0));
+    const bad = rows.filter(([, v]) => v != null && (S.hmMode === "foot" ? v <= -5 : v < 0)).length;
+    const note = S.hmMode === "foot" ? `${Math.round((bad / rows.length) * 100)}% of stores 5%+ below expected` : `${Math.round((bad / rows.length) * 100)}% of stores forecast below target`;
+    return `<div class="hm-group" style="--n:${rows.length}"><h3><span>${segLabel(t)} · ${rows.length} stores</span><span style="color:${bad / rows.length > 0.5 ? "var(--crit)" : "var(--muted)"}">${note}</span></h3>
+      <div class="hm">${rows.map(([r, v]) => `<i data-id="${r.id}" class="${r.id === S.hmSel ? "on" : ""}" style="background:${color(v)}" title="Store #${r.id}: ${v == null ? "no data" : pct(v)}"></i>`).join("")}</div></div>`;
+  }).join("");
+  const selR = S.hmSel && st.rows.find((x) => x.id === S.hmSel);
+  if (selR && types.includes(selR.type)) showStore(S.hmSel); else $("hm-detail").hidden = true;
+}
+function rgbHex(c) { if (c.startsWith("#")) return c; const m = c.match(/\d+/g).map(Number); return "#" + m.slice(0, 3).map((v) => v.toString(16).padStart(2, "0")).join(""); }
+function selectStore(id) {
+  const r = S.D.stores.rows.find((x) => x.id === id);
+  if (!r) { $("hm-detail").hidden = false; $("hm-detail").innerHTML = `<span>No store #${id}.</span>`; return; }
+  if (S.seg !== "All" && S.seg !== r.type) { S.seg = "All"; $("segment").value = "All"; S.hmSel = id; render(); }
+  else { S.hmSel = id; renderHeatmap(); }
+}
+function showStore(id) {
+  const st = S.D.stores, r = st.rows.find((x) => x.id === id); if (!r) return;
+  const max = Math.max(...r.spark, 1), w = 220, h = 36;
+  const pts = r.spark.map((v, i) => `${(i / (r.spark.length - 1)) * w},${h - 3 - (v / max) * (h - 6)}`).join(" ");
+  const pctT = r.target ? (r.fc / r.target) * 100 : null;
+  $("hm-detail").hidden = false;
+  $("hm-detail").innerHTML = `<b style="grid-column:1/-1;font-family:var(--f-display);font-size:15px">Store #${r.id} · ${segLabel(r.type)} · assortment ${r.assort.toUpperCase()} · competitor ${r.comp >= 1000 ? (r.comp / 1000).toFixed(1) + " km" : Math.round(r.comp) + " m"} away</b>
+    <span class="k">${MON(st.last_month, "long")} sales</span><span class="num">${fmtStore(r.last)}</span>
+    <span class="k">${MON(st.last_month, "long")} footfall vs expected</span><span class="num" style="color:var(${r.foot_gap < -5 ? "--crit" : "--ink"})">${r.foot_gap == null ? "–" : pct(r.foot_gap)}</span>
+    <span class="k">${MON(st.month, "long")} forecast</span><span class="num">${fmtStore(r.fc)}</span>
+    <span class="k">Target</span><span class="num">${r.target ? fmtStore(r.target) + ` (${Math.round(pctT)}%)` : "–"}</span>
+    <svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" style="grid-column:1/-1;max-width:${w}px" role="img" aria-label="Monthly sales, last 12 months"><polyline points="${pts}" fill="none" stroke="var(--actual)" stroke-width="1.6"/></svg>
+    <span class="k" style="grid-column:1/-1;font-size:11px">Monthly sales, ${MONY(st.spark_months[0])} – ${MONY(st.spark_months[st.spark_months.length - 1])}</span>`;
+}
+
+
+/* ---------- live API inspector ---------- */
+const CALLS = [];
+function instrumentFetch() {
+  const orig = window.fetch.bind(window);
+  window.fetch = async (input, init = {}) => {
+    const url = typeof input === "string" ? input : input.url;
+    if (!url.includes("/api/")) return orig(input, init);
+    const t0 = performance.now(), method = (init.method || "GET").toUpperCase();
+    try {
+      const res = await orig(input, init);
+      const ms = performance.now() - t0;
+      res.clone().text().then((txt) => {
+        let snip = txt;
+        try { const j = JSON.parse(txt); snip = txt.length > 1500 ? `{ ${Object.keys(j).slice(0, 12).join(", ")}${Object.keys(j).length > 12 ? ", …" : ""} }` : JSON.stringify(j, null, 1); } catch (e) { /* not json */ }
+        CALLS.unshift({ method, path: url.replace(location.origin, ""), status: res.status, ms, kb: txt.length / 1024, body: init.body || null, snip: snip.slice(0, 600), at: new Date() });
+        if (CALLS.length > 25) CALLS.pop();
+        renderCalls();
+      }).catch(() => {});
+      return res;
+    } catch (err) {
+      CALLS.unshift({ method, path: url, status: "ERR", ms: performance.now() - t0, kb: 0, body: init.body || null, snip: String(err), at: new Date() });
+      renderCalls(); throw err;
+    }
+  };
+}
+function renderCalls() {
+  const n = CALLS.length;
+  $("api-count").textContent = S.live === false && S.D ? "Snapshot · no live API" : `API · ${n} call${n === 1 ? "" : "s"}${n ? ` · last ${Math.round(CALLS[0].ms)} ms` : ""}`;
+  $("api-list").innerHTML = n ? CALLS.map((c) => `<div class="call"><div class="top"><span class="meth">${c.method}</span><span>${esc(c.path)}</span><span class="${c.status === 200 ? "ok" : "bad"}">${c.status}</span><span>${Math.round(c.ms)} ms</span><span>${c.kb.toFixed(1)} KB</span><span style="color:var(--muted)">${c.at.toLocaleTimeString("en-GB")}</span></div>${c.body ? `<pre>→ ${esc(c.body)}</pre>` : ""}<pre>← ${esc(c.snip)}</pre></div>`).join("")
+    : `<p class="sub">No calls yet. Move a what-if slider to see one.</p>`;
+}
+
+/* ---------- theme, shortcuts, toast ---------- */
+function toast(msg, ms = 2600) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), ms); }
+function isDark() { const a = document.documentElement.getAttribute("data-theme"); return a ? a === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches; }
+function setTheme(mode) {
+  document.documentElement.setAttribute("data-theme", mode);
+  try { localStorage.setItem("vh-theme", mode); } catch (e) { /* storage blocked */ }
+  if (S.D) { renderHeatmap(); }
+}
+function setupPro() {
+  try { const t = localStorage.getItem("vh-theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) { /* ignore */ }
+  $("theme-btn").onclick = () => setTheme(isDark() ? "light" : "dark");
+  $("keys-btn").onclick = () => toast("1–4 switch month · / ask a question · T guided demo · D dark mode · A API inspector · Esc close", 5000);
+  $("tour-btn").onclick = () => tourStart();
+  $("api-btn").onclick = () => { const d = $("api-drawer"); d.hidden = !d.hidden; $("api-btn").setAttribute("aria-expanded", !d.hidden); renderCalls(); };
+  $("api-clear").onclick = () => { CALLS.length = 0; renderCalls(); };
+  $("tour-next").onclick = () => tourGo(TOUR.i + 1);
+  $("tour-back").onclick = () => tourGo(TOUR.i - 1);
+  $("tour-exit").onclick = tourEnd;
+  renderCalls();
+  document.addEventListener("keydown", (e) => {
+    const typing = /input|textarea|select/i.test(e.target.tagName);
+    if (!$("tour").hidden) {
+      if (e.key === "ArrowRight") { tourGo(TOUR.i + 1); return; }
+      if (e.key === "ArrowLeft") { tourGo(TOUR.i - 1); return; }
+      if (e.key === "Escape") { tourEnd(); return; }
+    }
+    if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (/^[1-4]$/.test(e.key)) { S.view = +e.key - 1; S.animChart = true; render(); }
+    else if (e.key === "/") { e.preventDefault(); $("ask-q").focus(); }
+    else if (e.key.toLowerCase() === "t") tourStart();
+    else if (e.key.toLowerCase() === "d") setTheme(isDark() ? "light" : "dark");
+    else if (e.key.toLowerCase() === "a") $("api-btn").click();
+    else if (e.key === "?") $("keys-btn").click();
+    else if (e.key === "Escape") $("api-drawer").hidden = true;
+  });
+}
+
+/* ---------- under the hood ---------- */
+function renderUTH() {
+  const D = S.D, m = D.meta, w = m.ensemble_weights.sales;
+  $("uth-run").textContent = m.generated_at;
+  const storeDays = D.future_months.reduce((a, f) => a + (D.calendar.All[f] ? D.calendar.All[f].open_store_days : 0), 0);
+  // Production architecture on the Microsoft stack, with what stands in for each part in this offline demo
+  const nodes = [
+    ["Microsoft Fabric Lakehouse", "Store sales, promo calendar,\nstore master data", "Demo: DuckDB file + CSVs (local stand-in)"],
+    ["dbt semantic models", "stg_* → fct_store_day →\nfct_monthly_kpi (5 SQL models)", "Demo: same SQL, run on DuckDB"],
+    ["ML forecasting", `LightGBM ${Math.round(w * 100)}% + SARIMAX ${Math.round((1 - w) * 100)}%\n${storeDays.toLocaleString("en-GB")} store-days · SHAP · scenarios`, "Prod: Fabric notebook · Demo: local Python job"],
+    ["Power BI", "fct_kpi_forecast semantic table\n+ DAX measures (view, MAPE, coverage)", "Demo: table + DAX ready; report not built yet"],
+    ["Azure OpenAI", "What / Why / What to do\nfrom decision facts only", "Demo: deterministic template (no key set)"],
+    ["Microsoft Teams", "Action card: risk, forecast,\nrecommendation, buttons", "Demo: card generated; posts when a webhook is set"],
+  ];
+  $("flow").innerHTML = `<svg class="wire" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><path d="M3 5 H97" fill="none" stroke="var(--fc)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-dasharray="6 6" style="${REDUCED ? "" : "animation:flow 1s linear infinite"}"/></svg>` +
+    nodes.map(([t, d, f], i) => `<div class="node"><span class="st" style="color:var(--fc)">${i + 1} · Microsoft stack</span><b>${t}</b><span class="m">${esc(d).replace(/\n/g, "<br>")}</span><code>${esc(f)}</code></div>`).join("");
+
+  // calibration: out-of-sample backtest forecasts with their own 80% ranges (all stores)
+  const bt = D.series.All.sales.backtest;
+  const errs = bt.map((b) => Math.log(b.actual / b.forecast));
+  const lows = bt.map((b) => Math.log(b.lo80 / b.forecast)), highs = bt.map((b) => Math.log(b.hi80 / b.forecast));
+  const inside = bt.filter((b) => b.actual >= b.lo80 && b.actual <= b.hi80).length;
+  const bias = (bt.reduce((a, b) => a + (b.forecast / b.actual - 1), 0) / bt.length) * 100;
+  const scale = Math.max(...highs, ...lows.map(Math.abs), ...errs.map(Math.abs)) * 1.25;
+  const y = (v) => 50 - (v / scale) * 50;
+  const cal = errs.map((e, i) => `<div><div class="col" title="${MONY(bt[i].month)}: actual ${pct(Math.expm1(e) * 100)} vs forecast"><span class="band" style="top:${y(highs[i])}%;bottom:${100 - y(lows[i])}%"></span><span class="mid" style="top:50%"></span><span class="dot" style="top:${y(e)}%"></span></div>${MON(bt[i].month)}</div>`).join("");
+
+  // reconciliation check: stores add up to their store type
+  let recon = "";
+  if (D.stores) {
+    const gaps = ["a", "b", "c", "d"].map((t) => {
+      const sum = D.stores.rows.filter((r) => r.type === t).reduce((a, r) => a + r.fc, 0);
+      const seg = D.series[t].sales.forecast.find((x) => x.month === D.stores.month).p50;
+      return Math.abs(sum / seg - 1) * 100;
+    });
+    recon = `Σ stores vs store-type forecast\nmax gap ${Math.max(...gaps).toFixed(3)}% (${D.stores.rows.length.toLocaleString("en-GB")} stores)`;
+  }
+  const acc = D.accuracy, ens = acc[0].mape_total, ets = (acc.find((x) => x.model.startsWith("ETS")) || {}).mape_total;
+  $("mcard").innerHTML = `
+    <div class="mc"><span class="eyebrow">Accuracy · MAPE</span><span class="v">${ens.toFixed(1)}%</span><span class="d">One-month-ahead, rolling-origin backtest over ${bt.length} months, scored out-of-sample. ETS (Power BI's method): ${ets ? ets.toFixed(1) + "%" : "–"}. Bias ${pct(bias, 2)}. Target ≤ ${m.target_mape}%.</span></div>
+    <div class="mc"><span class="eyebrow">Range calibration · all stores</span><span class="v">${inside}/${bt.length} inside 80%</span><div class="cal" role="img" aria-label="Backtest errors against the 80% range">${cal}</div><span class="d">Dot = actual vs the forecast (line). Shaded = the out-of-sample 80% range shown at the time.</span></div>
+    <div class="mc"><span class="eyebrow">Ensemble weights</span><div class="wbar"><span style="width:${w * 100}%;background:var(--fc)"></span><span style="width:${(1 - w) * 100}%;background:var(--muted)"></span></div><span class="d"><b>LightGBM ${Math.round(w * 100)}%</b> (store × day, summed) · <b>SARIMAX ${Math.round((1 - w) * 100)}%</b> (monthly). Weights ∝ 1 / backtest MAPE (scored leave-one-month-out). Both carry 90% of last month's surprise forward.</span></div>
+    <div class="mc"><span class="eyebrow">Ranges & target odds</span><pre>σ  = RMSE of log error (backtest)
+σh = σ · (1 + 0.15·(h − 1))
+80% = ŷ · exp(±1.28 σh)
+P(hit) = 1 − Φ((ln T − ln ŷ) / σh)</pre></div>
+    <div class="mc"><span class="eyebrow">Leakage guard</span><pre>train ≤ cutoff, score > cutoff
+level = 364-day mean, lag 92 d
+calendar = planned (test.csv)
+⇒ every input known 90 d ahead</pre></div>
+    <div class="mc"><span class="eyebrow">Hierarchy check</span><pre>${recon || "store data not loaded"}
+proportional top-down
+reconciliation</pre></div>`;
+}
+
+/* ---------- guided demo ---------- */
+const TOUR = { i: -1, el: null };
+const TOUR_STEPS = [
+  { t: "Every dashboard stops here", p: "Last month's actuals: what happened. By the time this is reported, the next month is already half gone.", go: () => { S.view = 0; S.seg = "All"; $("segment").value = "All"; S.animChart = true; render(); }, el: () => $("hero") },
+  { t: "Four answers, one screen", p: "Next month: what will happen, how confident we are, why, and what to do, all from the live pipeline.", go: () => { S.view = 1; S.animChart = true; render(); }, el: () => $("hero") },
+  { t: "Action required", p: "The engine scans every store type and surfaces the one most at risk of missing target, with its leading indicator.", go: () => {}, el: () => $("action") },
+  { t: "From a slowdown to a decision", p: "Store type D: footfall falls first, the anomaly is flagged, sales risk and target probability follow, scenarios are tested, a recommendation is made. (Controlled demo scenario in synthetic data.)", go: () => { S.seg = "d"; $("segment").value = "d"; resetWhatIf(); S.animChart = true; render(); }, el: () => $("ew") },
+  { t: "Scenario Lab", p: "Base, recovery and downside side by side, plus every tested intervention with a transparent decision score.", go: () => {}, el: () => $("scenarios") },
+  { t: "Recommend the action", p: "The best-scoring intervention is applied and re-scored live through the API. It is a model-based estimate, not causal proof.", go: () => applyRecommendation(), el: () => $("tested").closest(".tbl-wrap") },
+  { t: "Why is this happening?", p: "SHAP splits the change vs last month into drivers; the alerts show the leading indicator.", go: () => {}, el: () => $("drv-h").closest(".panel") },
+  { t: "Can I trust it?", p: "Out-of-sample backtest: accuracy, how often the 80% and 95% ranges held, and the gap to Power BI's built-in method.", go: () => {}, el: () => $("trust") },
+  { t: "How it reaches the business", p: "Fabric Lakehouse → dbt → ML → Power BI → Azure OpenAI → Teams. Locally, DuckDB and a Python job stand in for Fabric.", go: () => { S.seg = "All"; $("segment").value = "All"; render(); }, el: () => $("uth") },
+];
+function resetWhatIf() { ["wi-promo", "wi-foot", "wi-ticket"].forEach((id) => ($(id).value = 0)); S.lastOdds = null; }
+function tourStart() { stopPlay(); resetWhatIf(); $("api-drawer").hidden = true; $("tour").hidden = false; tourGo(0); }
+function tourGo(i) {
+  if (i < 0) return;
+  if (i >= TOUR_STEPS.length) { tourEnd(); toast("That's Vantage Horizon: next month, not just last month."); return; }
+  if (TOUR.el) TOUR.el.classList.remove("tour-on");
+  TOUR.i = i;
+  const st = TOUR_STEPS[i];
+  st.go();
+  const el = st.el();
+  TOUR.el = el;
+  if (el) { el.classList.add("tour-on"); el.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "center" }); }
+  $("tour-step").textContent = `Step ${i + 1} of ${TOUR_STEPS.length}`;
+  $("tour-title").textContent = st.t;
+  $("tour-text").textContent = st.p;
+  $("tour-bar").style.width = `${((i + 1) / TOUR_STEPS.length) * 100}%`;
+  $("tour-back").disabled = i === 0;
+  $("tour-next").textContent = i === TOUR_STEPS.length - 1 ? "Finish" : "Next →";
+}
+function tourEnd() { if (TOUR.el) TOUR.el.classList.remove("tour-on"); TOUR.el = null; TOUR.i = -1; $("tour").hidden = true; }
+
+/* ---------- business weather ---------- */
+const CLOUD = (fill) => `<g class="cl"><circle cx="26" cy="36" r="10" fill="${fill}"/><circle cx="38" cy="31" r="13" fill="${fill}"/><rect x="15" y="36" width="36" height="11" rx="5.5" fill="${fill}"/></g>`;
+const SUN = (cx, cy, r) => `<g class="rays" style="transform-origin:${cx}px ${cy}px">${[0, 45, 90, 135, 180, 225, 270, 315].map((a) => { const t = (a * Math.PI) / 180, r1 = r + 4, r2 = r + 9; return `<line x1="${cx + r1 * Math.cos(t)}" y1="${cy + r1 * Math.sin(t)}" x2="${cx + r2 * Math.cos(t)}" y2="${cy + r2 * Math.sin(t)}" stroke="var(--sun)" stroke-width="3" stroke-linecap="round"/>`; }).join("")}</g><circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--sun)"/>`;
+const DROPS = `<line class="dr" x1="22" y1="50" x2="20" y2="56" stroke="var(--rain)" stroke-width="2.5" stroke-linecap="round"/><line class="dr" x1="32" y1="50" x2="30" y2="56" stroke="var(--rain)" stroke-width="2.5" stroke-linecap="round"/><line class="dr" x1="42" y1="50" x2="40" y2="56" stroke="var(--rain)" stroke-width="2.5" stroke-linecap="round"/>`;
+const WX_ICON = {
+  sunny: SUN(32, 30, 12),
+  cloudy: SUN(24, 24, 9) + CLOUD("var(--muted)"),
+  rain: CLOUD("var(--muted)") + DROPS,
+  storm: CLOUD("var(--ink-2)") + `<polygon class="bolt" points="33,40 27,52 32,52 29,62 39,48 34,48 37,40" fill="var(--sun)"/>` + DROPS,
+};
+const WX_SAY = { sunny: "Clear skies: on track", cloudy: "Mixed: could go either way", rain: "Showers: target at risk", storm: "Storm warning: act now" };
+function wxKind(p) { return p >= 0.6 ? "sunny" : p >= 0.4 ? "cloudy" : p >= 0.2 ? "rain" : "storm"; }
+function renderWeather() {
+  const D = S.D, seg = S.seg, months = [lastMonth(), ...D.future_months];
+  $("wx-sub").textContent = `${segLabel(seg)} · our forecast turned into a weather report: the sunnier, the likelier we hit target. Tap a month to open it.`;
+  $("wx").innerHTML = months.map((m, i) => {
+    let kind, big, odds, fill, say;
+    const t = D.targets[seg][m];
+    if (i === 0) {
+      const a = actualFor(seg, "sales", m), met = t && a >= t;
+      kind = met ? "sunny" : "rain"; big = fmt.sales(a); fill = t ? Math.min(1, a / t) : 0;
+      say = met ? "Target met" : "Target missed"; odds = t ? `${Math.round((a / t) * 100)}% of the ${fmt.sales(t)} target (actual)` : "Actual";
+    } else {
+      const p = D.p_hit[seg][m], f = fcFor(seg, "sales", m);
+      kind = wxKind(p); big = fmt.sales(f.p50); fill = p; say = WX_SAY[kind];
+      odds = `${Math.round(p * 100)}% chance to hit ${fmt.sales(t)}`;
+    }
+    const col = kind === "sunny" ? "--good" : kind === "cloudy" ? "--warn" : "--crit";
+    return `<button type="button" class="wxc ${kind}" data-i="${i}" aria-pressed="${i === S.view}" style="animation-delay:${i * 80}ms">
+      <svg class="ic" viewBox="0 0 64 64" aria-hidden="true">${WX_ICON[kind]}</svg>
+      <span class="mo">${MONY(m)} · ${i === 0 ? "actual" : ["", "next month", "+60 days", "+90 days"][i]}</span>
+      <span class="big">${big}</span>
+      <span class="say" style="color:var(${col})">${say}</span>
+      <span class="odds">${odds}</span>
+      <span class="meter"><span style="width:${Math.round(fill * 100)}%;background:var(${col})"></span></span>
+    </button>`;
+  }).join("");
+}
+
+/* ---------- play the future ---------- */
+function stopPlay() { clearInterval(S.playT); S.playT = null; const b = $("play-btn"); b.textContent = "▶ Play the future"; b.classList.remove("playing"); }
+function startPlay() {
+  const b = $("play-btn"); b.textContent = "■ Stop"; b.classList.add("playing");
+  S.view = 0; S.animChart = true; render();
+  S.playT = setInterval(() => {
+    if (S.view >= 3) { stopPlay(); toast("That's the next 90 days."); return; }
+    S.view += 1; S.animChart = true; render();
+  }, 2600);
+}
+
+/* ---------- confetti ---------- */
+function celebrate() {
+  toast("Target now likely. Nice move!");
+  if (REDUCED) return;
+  const cv = $("confetti"), ctx = cv.getContext("2d");
+  cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio; cv.hidden = false;
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  const cols = ["--fc", "--sun", "--good", "--crit", "--teams", "--pos"].map(css);
+  const P = Array.from({ length: 160 }, () => ({ x: innerWidth / 2 + (Math.random() - 0.5) * 200, y: innerHeight * 0.35, vx: (Math.random() - 0.5) * 14, vy: -Math.random() * 14 - 4, s: 5 + Math.random() * 6, r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.3, c: cols[Math.floor(Math.random() * cols.length)] }));
+  const t0 = performance.now();
+  const frame = (now) => {
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    P.forEach((p) => { p.vy += 0.35; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.r += p.vr; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); ctx.restore(); });
+    if (now - t0 < 2600) requestAnimationFrame(frame); else { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); cv.hidden = true; }
+  };
+  requestAnimationFrame(frame);
+}
+
+/* ---------- voice & sharing ---------- */
+function summaryText() {
+  const D = S.D, seg = S.seg, m = viewMonth(), name = segLabel(seg);
+  if (S.view === 0) {
+    const a = actualFor(seg, "sales", m), t = D.targets[seg][m];
+    return `Vantage Horizon · ${name} · ${MON(m, "long")} (actual)\nSales: ${fmt.sales(a)}${t ? ` · ${Math.round((a / t) * 100)}% of the ${fmt.sales(t)} target` : ""}\nNext month: ${fmt.sales(fcFor(seg, "sales", D.future_months[0]).p50)} forecast, ${Math.round(D.p_hit[seg][D.future_months[0]] * 100)}% chance to hit target`;
+  }
+  const f = fcFor(seg, "sales", m), p = D.p_hit[seg][m], t = D.targets[seg][m], x = D.drivers[m][seg];
+  const alert = D.alerts.find((a) => a.segment === seg || seg === "All");
+  return [`Vantage Horizon · ${name} · ${MON(m, "long")} outlook`,
+    `Sales: ${fmt.sales(f.p50)} (likely ${fmt.sales(f.lo80)} to ${fmt.sales(f.hi80)})`,
+    `Chance of hitting the ${fmt.sales(t)} target: ${Math.round(p * 100)}% · ${WX_SAY[wxKind(p)]}`,
+    `Why: ${x.drivers.slice(0, 3).map((d) => `${drvName(d.name)} ${pct(d.pct)}`).join(", ")}`,
+    alert ? `Watch: ${alert.title}` : "",
+    `Data as of ${D.meta.as_of}`].filter(Boolean).join("\n");
+}
+function setupCool() {
+  $("wx").addEventListener("click", (e) => { const b = e.target.closest(".wxc"); if (!b) return; stopPlay(); S.view = +b.dataset.i; S.animChart = true; render(); });
+  $("play-btn").onclick = () => (S.playT ? stopPlay() : startPlay());
+  $("copy-btn").onclick = async () => {
+    try { await navigator.clipboard.writeText(summaryText()); toast("Summary copied. Paste it into Teams or WhatsApp."); }
+    catch (e) { toast("Copy was blocked by the browser. Select the summary text instead."); }
+  };
+  const sp = $("speak-btn");
+  if (!("speechSynthesis" in window)) sp.hidden = true;
+  sp.onclick = () => {
+    if (speechSynthesis.speaking) { speechSynthesis.cancel(); sp.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><path d="M2 6h3l4-3v10l-4-3H2z" fill="currentColor"/><path d="M11.5 5.5a3.5 3.5 0 0 1 0 5M13.5 3.5a6.3 6.3 0 0 1 0 9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Read it aloud'; return; }
+    const u = new SpeechSynthesisUtterance(summaryText().replace(/·/g, ",").split(CUR.s).join(CUR.w + " ").replace(/(\d)M\b/g, "$1 million").replace(/−/g, "minus "));
+    const v = speechSynthesis.getVoices().find((x) => /en-(IN|GB)/.test(x.lang)) || speechSynthesis.getVoices().find((x) => x.lang.startsWith("en"));
+    if (v) u.voice = v;
+    u.rate = 1.02; u.onend = () => (sp.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><path d="M2 6h3l4-3v10l-4-3H2z" fill="currentColor"/><path d="M11.5 5.5a3.5 3.5 0 0 1 0 5M13.5 3.5a6.3 6.3 0 0 1 0 9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Read it aloud');
+    sp.textContent = "■ Stop reading"; speechSynthesis.speak(u);
+  };
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition, mic = $("mic-btn");
+  if (!SR) { mic.hidden = true; return; }
+  mic.onclick = () => {
+    const rec = new SR(); rec.lang = "en-IN"; rec.interimResults = false; rec.maxAlternatives = 1;
+    mic.classList.add("on"); $("ask-q").placeholder = "Listening… ask about any month or store type";
+    rec.onresult = (e) => { const q = e.results[0][0].transcript; $("ask-q").value = q; answer(q); };
+    rec.onerror = () => toast("Voice input didn't work. It needs microphone permission and internet. Type the question instead.");
+    rec.onend = () => { mic.classList.remove("on"); $("ask-q").placeholder = "e.g. Will store type D hit target in November?"; };
+    rec.start();
+  };
+}
+
+/* ---------- plain-English takeaways under every visual ---------- */
+function renderTakeaways() {
+  const D = S.D, seg = S.seg, name = segName(seg), ym = viewMonth(), last = lastMonth(), fut = D.future_months;
+  const B = (x) => `<b>${x}</b>`;
+  const odds = (m, sg = seg) => Math.round(D.p_hit[sg][m] * 100);
+
+  // weather
+  const kinds = fut.map((m) => [m, wxKind(D.p_hit[seg][m])]);
+  const best = kinds.reduce((a, b) => (D.p_hit[seg][b[0]] > D.p_hit[seg][a[0]] ? b : a));
+  const worst = kinds.reduce((a, b) => (D.p_hit[seg][b[0]] < D.p_hit[seg][a[0]] ? b : a));
+  $("tk-wx").innerHTML = `For ${name}, the riskiest month is ${B(MON(worst[0], "long"))} (${odds(worst[0])}% chance to hit target) and the best is ${B(MON(best[0], "long"))} (${odds(best[0])}%).` +
+    (D.p_hit[seg][fut[0]] < 0.4 ? ` Next month needs action now.` : D.p_hit[seg][fut[0]] >= 0.6 ? ` Next month is on track.` : ` Next month could go either way.`);
+
+  // chart
+  const k = S.metric, ser = D.series[seg][k], a0 = actualFor(seg, k, last);
+  const fcs = ser.forecast, peak = fcs.reduce((a, b) => (b.p50 > a.p50 ? b : a));
+  const mName = { sales: "Sales", customers: "Footfall", ticket: "Average ticket" }[k];
+  let tc = `${mName} for ${name} ${k === "sales" ? "are" : "is"} expected to ${fcs[0].p50 >= a0 ? "rise" : "fall"} from ${B(fmt[k](a0))} in ${MON(last, "long")} to ${B(fmt[k](fcs[0].p50))} in ${MON(fcs[0].month, "long")}`;
+  tc += peak.month !== fcs[0].month ? `, then reach ${B(fmt[k](peak.p50))} in ${MON(peak.month, "long")}${peak.month.endsWith("-12") ? " (Christmas season)" : ""}.` : ".";
+  if (ser.backtest && ser.backtest.length) {
+    const err = ser.backtest.reduce((s2, b) => s2 + Math.abs(b.forecast / b.actual - 1), 0) / ser.backtest.length * 100;
+    tc += ` Our past forecasts (circles) were off by only ${B(err.toFixed(1) + "%")} on average, so the shaded range is worth trusting.`;
+  }
+  $("tk-chart").innerHTML = tc;
+
+  // store-type table
+  const segs = ["a", "b", "c", "d"];
+  if (S.view === 0) {
+    const met = segs.filter((g) => actualFor(g, "sales", ym) >= D.targets[g][ym]);
+    $("tk-seg").innerHTML = `In ${MON(ym, "long")}, ${B(met.length + " of 4")} store types met target${met.length ? ` (${met.map((g) => segLabel(g).replace("Store type ", "")).join(", ")})` : ""}. Overall the chain reached ${B(Math.round((actualFor("All", "sales", ym) / D.targets.All[ym]) * 100) + "%")} of target.`;
+  } else {
+    const sorted = segs.slice().sort((x, y) => D.p_hit[x][ym] - D.p_hit[y][ym]);
+    $("tk-seg").innerHTML = `${B(segLabel(sorted[0]))} is the biggest worry in ${MON(ym, "long")} with only ${/^(8|11|18)/.test(String(odds(ym, sorted[0]))) ? "an" : "a"} ${B(odds(ym, sorted[0]) + "%")} chance to hit target. ${B(segLabel(sorted[3]))} is the safest at ${B(odds(ym, sorted[3]) + "%")}.`;
+  }
+
+  // heatmap
+  if (D.stores) {
+    const rows = D.stores.rows;
+    if (S.hmMode === "foot") {
+      const share = (g) => { const r = rows.filter((x) => x.type === g && x.foot_gap != null); return Math.round((r.filter((x) => x.foot_gap <= -5).length / r.length) * 100); };
+      const worstT = segs.slice().sort((x, y) => share(y) - share(x))[0];
+      const others = Math.round(segs.filter((g) => g !== worstT).reduce((s2, g) => s2 + share(g), 0) / 3);
+      $("tk-hm").innerHTML = `${B(share(worstT) + "%")} of ${segLabel(worstT)} stores had noticeably fewer visitors than expected in ${MON(D.stores.last_month, "long")}, against about ${B(others + "%")} elsewhere. The problem is concentrated in ${B(segLabel(worstT))}, not spread across the chain.`;
+    } else {
+      const below = rows.filter((r) => r.target && r.fc < r.target).length;
+      $("tk-hm").innerHTML = `${B(below.toLocaleString("en-GB") + " of " + rows.length.toLocaleString("en-GB"))} stores are forecast below target in ${MON(D.stores.month, "long")}. Click a red square to see which store and by how much.`;
+    }
+  }
+
+  // trust
+  const acc = D.accuracy, ens = acc[0].mape_total, ets = (acc.find((x) => x.model.startsWith("ETS")) || {}).mape_total;
+  $("tk-acc").innerHTML = `Our forecast missed by ${B(ens.toFixed(1) + "%")} on average${ets ? `, about ${B((ets / ens).toFixed(1) + "×")} more accurate than Power BI's built-in method (${ets.toFixed(1)}%)` : ""}, and well inside our ${D.meta.target_mape}% goal. (Measured on synthetic data.)`;
+
+  // drivers
+  if (S.view === 0) {
+    const g = D.global_importance;
+    $("tk-drv").innerHTML = `${B(g[0].name)} move sales the most, followed by ${B(g[1].name.toLowerCase())} and ${B(g[2].name.toLowerCase())}. Switch to a future month to see what changes next.`;
+  } else {
+    const x = D.drivers[ym][seg], up = x.drivers.filter((d) => d.pct > 0).slice(0, 2), down = x.drivers.filter((d) => d.pct < 0)[0];
+    $("tk-drv").innerHTML = `${MON(ym, "long")} is ${B(pct(x.total_pct))} vs ${MON(last, "long")}` + (up.length ? `, mainly because of ${up.map((d) => `${B(drvName(d.name).toLowerCase())} (${pct(d.pct)})`).join(" and ")}` : "") + (down ? `, partly offset by ${B(drvName(down.name).toLowerCase())} (${pct(down.pct)})` : "") + ".";
+  }
+
+  // alerts
+  const list = D.alerts.filter((x) => seg === "All" || x.segment === seg || x.segment === "All");
+  const lead = list.find((x) => x.kind === "leading_indicator");
+  $("tk-al").innerHTML = !list.length ? "Nothing needs attention right now." :
+    `${B(list.length + " warning" + (list.length > 1 ? "s" : ""))}.` + (lead ? ` Most urgent: ${B(lead.segment_label)} has had fewer visitors than expected for ${B(lead.weeks.filter((w) => w.z <= -2.5).length + " weeks")}. Fewer visitors today means lower sales this month, so act before month-end.` : ` Most urgent: ${B(list[0].title)}.`);
+
+  // under the hood
+  $("tk-uth").innerHTML = `The forecast is ${B("tested")} on past months, ${B("explained")} by its drivers, and ${B("consistent")}: every store adds up to its store type and the total. The same table feeds this page, Power BI and Teams.`;
+}
+
+/* ================= decision-intelligence views (v0.2) ================= */
+function decMonth() { return S.view > 0 ? viewMonth() : S.D.future_months[0]; }
+function decFor(seg = S.seg, m = decMonth()) { return S.D.decisions[m][seg]; }
+// Most urgent decision: the selected store type, or (for "All stores") the store type with the lowest
+// target probability if it needs action, else the chain total. Mirrors vantage.decision.top_decision.
+function focusDecision(m = decMonth()) {
+  if (S.seg !== "All") return decFor(S.seg, m);
+  const segs = ["a", "b", "c", "d"].map((s) => decFor(s, m)).filter((x) => x.p_hit != null);
+  const worst = segs.reduce((a, b) => (b.p_hit < a.p_hit ? b : a));
+  return worst.action_required ? worst : decFor("All", m);
+}
+const riskCls = (r) => (r === "Critical" || r === "High" ? "crit" : r === "Medium" ? "warn" : "good");
+const pctp = (p) => (p == null ? "–" : p < 0.005 ? "<1%" : p > 0.995 ? ">99%" : Math.round(p * 100) + "%");
+function goTo(id, seg) {
+  if (seg && seg !== S.seg) { S.seg = seg; $("segment").value = seg; resetWhatIf(); S.animChart = true; render(); }
+  const el = $(id); if (el) { el.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" }); flashPanel(el); }
+}
+
+function renderHero() {
+  const D = S.D, m = decMonth(), d = decFor(S.seg, m), tr = D.trust, cov = tr.coverage.sales;
+  const ens = tr.accuracy.find((a) => a.model === "Vantage ensemble");
+  const forM = S.view === 0 ? ` <span class="s">for ${MON(m, "long")}</span>` : "";
+  if (S.view === 0) {
+    const ym = lastMonth(), a = actualFor(S.seg, "sales", ym), p = actualFor(S.seg, "sales", prevYm(ym)), t = D.targets[S.seg][ym];
+    $("hq-what").innerHTML = `<span class="q">1 · What happened?</span><span class="s">${MON(ym, "long")} · ${esc(segLabel(S.seg))} · actual</span>
+      <span class="big">${fmt.sales(a)}</span><span class="s"><b>${pct((a / p - 1) * 100)}</b> vs ${MON(prevYm(ym))}${t ? ` · <b>${Math.round((a / t) * 100)}%</b> of target` : ""}</span>
+      <button class="lnk" type="button" data-view="1">See next month →</button>`;
+  } else {
+    $("hq-what").innerHTML = `<span class="q">1 · What will happen?</span><span class="s">${esc(d.month_label)} · ${esc(d.segment_label)} · forecast</span>
+      <span class="big num">${fmt.sales(d.forecast)}</span>
+      <span class="s"><b>${pct(d.change_vs_last_pct)}</b> vs ${MON(lastMonth())} actual</span>
+      ${d.target ? hitChip(d.p_hit, d.target) : ""}`;
+  }
+  const lo = d.lo95, hi = d.hi95, span = hi - lo, X = (v) => Math.max(0, Math.min(100, ((v - lo) / span) * 100));
+  $("hq-conf").innerHTML = `<span class="q">2 · How confident are we?</span>${forM}
+    <span class="mid num">${fmt.sales(d.lo80)} – ${fmt.sales(d.hi80)}</span>
+    <span class="s">80% likely range · 95%: ${fmt.sales(d.lo95)} – ${fmt.sales(d.hi95)}</span>
+    <div class="rangebar" role="img" aria-label="Forecast range with target marker"><span style="left:0;right:0;background:var(--band95)"></span><span style="left:${X(d.lo80)}%;width:${X(d.hi80) - X(d.lo80)}%;background:var(--band80)"></span><i style="left:${X(d.forecast)}%;background:var(--fc)"></i>${d.target && d.target > lo && d.target < hi ? `<i style="left:${X(d.target)}%;background:var(--warn)" title="Target"></i>` : ""}</div>
+    <span class="s">Backtest: <b>${cov.inside80}/${cov.n}</b> outcomes inside the 80% range · error <b>${ens.mape_total.toFixed(1)}%</b> (out-of-sample)</span>`;
+  const drv = d.top_drivers.slice(0, 2).map((x) => `${esc(drvName(x.name))} <b>${pct(x.pct)}</b>`).join(" · ");
+  $("hq-why").innerHTML = `<span class="q">3 · Why?</span>${forM}
+    <span class="s" style="font-size:14.5px;color:var(--ink)">${esc(d.top_reason)}</span>
+    <span class="s">Top drivers: ${drv}</span>
+    <button class="lnk" type="button" data-go="why">See the drivers ↓</button>`;
+  const r = d.recommended;
+  $("hq-do").innerHTML = `<span class="q">4 · What should we do?</span>${forM}
+    <span class="mid">${esc(r.label)}</span>
+    <span class="s">${esc(convertText(r.impact_text))}</span>
+    <span class="s">Evidence: <b>${esc(d.evidence.level)}</b> · model-based estimate, not causal proof</span>
+    <button class="lnk" type="button" data-go="scenarios">Open the Scenario Lab ↓</button>`;
+}
+
+function renderAction() {
+  const f = focusDecision(), el = $("action"), cls = riskCls(f.risk_level);
+  const tag = f.action_required ? "Action required" : f.risk_level === "Medium" ? "Watch" : "On track";
+  const icon = f.action_required ? "✕" : f.risk_level === "Medium" ? "!" : "✓";
+  const demo = f.segment === "d" && f.leading_indicator.flagged;
+  el.className = "action " + cls;
+  el.innerHTML = `<div style="display:grid;gap:4px"><span class="tag" style="color:var(--${cls === "good" ? "good" : cls})">${icon} ${tag}</span><span class="pct num">${pctp(f.p_hit)}</span><span class="s" style="font-size:12px;color:var(--ink-2)">chance to hit target</span></div>
+    <div class="body"><span class="t">${esc(f.segment_label)} · ${esc(f.month_label)}${S.seg === "All" && f.segment !== "All" ? ` <span class="chip">most at-risk store type</span>` : ""}${demo ? ` <span class="chip" title="The footfall slowdown in store type D was planted in the synthetic data to demonstrate the early warning. It is not evidence of real-world accuracy.">Controlled demo scenario</span>` : ""}</span>
+      <span class="d"><b>Leading indicator:</b> ${esc(f.leading_indicator.text)}</span>
+      <span class="d"><b>Top reason:</b> ${esc(f.top_reason)}</span>
+      <span class="d"><b>Recommended:</b> ${esc(f.recommended.label)} · ${esc(convertText(f.recommended.impact_text))}</span></div>
+    <div class="btns"><button class="tbtn" type="button" data-go="why" data-seg="${f.segment}">View why</button><button class="tbtn primary" type="button" data-go="scenarios" data-seg="${f.segment}">Run scenarios</button></div>`;
+}
+
+function renderChain() {
+  const f = focusDecision(), L = f.leading_indicator, rec = f.recommended;
+  $("ew-sub").textContent = `${f.segment_label}: how a footfall slowdown turns into a sales decision for ${f.month_label}.`;
+  $("ew-demo").hidden = !(f.segment === "d" && L.flagged);
+  $("ew-demo").title = "Store type D's slowdown was planted in the synthetic data to demonstrate this flow. Not evidence of real-world accuracy.";
+  const gap = f.impact.target_gap;
+  const steps = [
+    ["Footfall", L.gap_pct != null ? pct(L.gap_pct) : "–", `vs expected in ${MON(L.month || lastMonth(), "long")}`, L.gap_pct < -2 ? "bad" : "ok"],
+    ["Leading indicator", L.flagged ? `${L.weeks_flagged} of ${L.weeks} weeks` : "Normal", L.z_min != null ? `flagged below z −2.5 (worst z ${L.z_min.toFixed(1)})` : "", L.flagged ? "bad" : "ok"],
+    ["Future sales risk", gap > 0 ? `−${fmt.sales(gap)}` : `+${fmt.sales(-gap)}`, gap > 0 ? `forecast below the ${fmt.sales(f.target)} target` : "forecast above target", gap > 0 ? "bad" : "ok"],
+    ["Target probability", pctp(f.p_hit), `${f.risk_level} risk`, f.p_hit < 0.4 ? "bad" : f.p_hit < 0.6 ? "" : "ok"],
+    ["Scenarios tested", `${f.tested.length - 1} options`, `promo +${f.tested[1].promo_delta} to +${f.tested[f.tested.length - 1].promo_delta} days, scored`, ""],
+    ["Recommendation", rec.label, rec.promo_delta ? `target probability → ${pctp(rec.p_hit)} (modeled)` : rec.why, rec.promo_delta ? "ok" : ""],
+  ];
+  $("chain").innerHTML = steps.map(([n, v, x, c], i) => `<div class="step ${c}" style="animation-delay:${i * 70}ms"><span class="n">${i + 1} · ${n}</span><span class="v">${esc(v)}</span><span class="x">${esc(x)}</span></div>`).join("");
+}
+
+function renderScenarioLab() {
+  const d = decFor(), sc = d.scenarios, rec = d.recommended, base = sc.base, w = d.score_weights;
+  $("scn-sub").textContent = `${d.segment_label} · ${d.month_label}. Base, recovery and downside side by side. Promo days are re-scored by the model; footfall and ticket are manual assumptions. Estimates are model-based, not causal proof.`;
+  const imp = d.impact;
+  $("impact").innerHTML = [
+    ["Target gap", imp.target_gap > 0 ? fmt.sales(imp.target_gap) : "None", imp.target_gap > 0 ? "forecast short of target" : "forecast at or above target"],
+    ["Downside exposure", fmt.sales(imp.downside_exposure), "forecast minus the low end of the 80% range"],
+    ["Modeled upside", imp.modeled_upside > 0 ? "+" + fmt.sales(imp.modeled_upside) : "–", rec.promo_delta ? `with ${rec.label}` : "no intervention recommended"],
+    ["Probability gain", imp.probability_gain_pp > 0 ? `+${imp.probability_gain_pp.toFixed(0)} pts` : "–", rec.promo_delta ? `${pctp(base.p_hit)} → ${pctp(rec.p_hit)}` : `stays ${pctp(base.p_hit)}`],
+  ].map(([k, v, x]) => `<div class="imp"><span class="k">${k}</span><span class="v">${v}</span><span class="x">${esc(x)}</span></div>`).join("");
+  const isRec = (s) => (s.name === "Recovery" && rec.promo_delta > 0) || (s.name === "Base" && rec.promo_delta === 0);
+  $("scn3").innerHTML = [sc.base, sc.recovery, sc.downside].map((s) => {
+    const dv = s.p50 - base.p50;
+    return `<div class="scn ${isRec(s) ? "rec" : ""}"><span class="nm">${s.name}${s.name === "Recovery" ? ` <span class="chip">${esc(s.label)}</span>` : ""}${isRec(s) ? ` <span class="badge">Recommended</span>` : ""}</span>
+      <span class="val num">${fmt.sales(s.p50)}</span>
+      <span class="row2">${s.name === "Base" ? "current plan" : `${dv >= 0 ? "+" : "−"}${fmt.sales(Math.abs(dv))} (${pct((s.p50 / base.p50 - 1) * 100)}) vs base`}</span>
+      <span class="row2">${s.target ? hitChip(s.p_hit, s.target) : ""}</span>
+      <span class="row2">80% range ${fmt.sales(s.lo80)} – ${fmt.sales(s.hi80)}</span>
+      <ul>${s.assumptions.map((a) => `<li>${esc(a)}</li>`).join("")}</ul></div>`;
+  }).join("");
+  const all = [sc.downside, sc.base, sc.recovery], lo = Math.min(...all.map((s) => s.lo80), base.target || Infinity) * 0.995, hi = Math.max(...all.map((s) => s.hi80), base.target || 0) * 1.005;
+  const X = (v) => ((v - lo) / (hi - lo)) * 100;
+  const col = (s) => (s.name === "Downside" ? "var(--neg)" : s.name === "Recovery" ? "var(--fc)" : "var(--muted)");
+  $("compare").innerHTML = `<div class="cmp"><h4>Modeled sales vs target</h4>${all.map((s) => `<div class="cbar"><span>${s.name}</span><div class="tr"><span style="width:${X(s.p50)}%;background:${col(s)}"></span>${base.target ? `<i style="left:${X(base.target)}%" title="Target"></i>` : ""}</div><span class="vv">${fmt.sales(s.p50)}</span></div>`).join("")}</div>
+    <div class="cmp"><h4>Chance to hit target</h4>${all.map((s) => `<div class="cbar"><span>${s.name}</span><div class="tr"><span style="width:${(s.p_hit || 0) * 100}%;background:${col(s)}"></span></div><span class="vv">${pctp(s.p_hit)}</span></div>`).join("")}</div>`;
+  $("tested").innerHTML = `<thead><tr><th scope="col">Tested intervention</th><th scope="col">Promo days</th><th scope="col">Modeled sales</th><th scope="col">Δ sales</th><th scope="col">Chance</th><th scope="col">Δ chance</th><th scope="col">Outside history</th><th scope="col">Decision score</th></tr></thead><tbody>` +
+    d.tested.map((t) => `<tr class="${t.recommended ? "recrow" : ""}" title="Score = ${Object.entries(t.parts).map(([k, v]) => `${k.replace("_", " ")} ${v.toFixed(1)}`).join(" + ")}"><td>${esc(t.label)}${t.recommended ? " ★" : ""}</td><td>${t.promo_days}</td><td>${fmt.sales(t.p50)}</td><td>${t.promo_delta ? "+" + fmt.sales(t.delta_sales) : "–"}</td><td>${pctp(t.p_hit)}</td><td>${t.promo_delta ? "+" + (t.delta_p_pp || 0).toFixed(0) + " pts" : "–"}</td><td>${t.extrapolation_pp > 0 ? t.extrapolation_pp.toFixed(1) + " pts" : "no"}</td><td>${t.score.toFixed(1)}</td></tr>`).join("") + "</tbody>";
+  $("formula").innerHTML = `<b>How the recommendation is chosen.</b> <code>Decision score = ${w.prob_pp} × gain in chance to hit target (points) + ${w.sales_pct} × modeled sales gain (%) − ${w.complexity_per_day} × promo days added − ${w.extrapolation_pp} × points of promo share above anything seen in history</code>. The day penalty is an intervention-complexity proxy, not a money cost (the data has no cost information). An action is recommended only when the chance to hit target is below ${Math.round(0.6 * 100)}% and its score is positive. <b>${esc(rec.label)}:</b> ${esc(rec.why)}.`;
+  $("tk-scn").innerHTML = rec.promo_delta
+    ? `Of the ${d.tested.length - 1} interventions tested, <b>${esc(rec.label)}</b> scores best: modeled sales <b>+${fmt.sales(rec.delta_sales)}</b> and the chance to hit target <b>${pctp(base.p_hit)} → ${pctp(rec.p_hit)}</b>. In the downside case (${esc(sc.downside.assumptions[0].toLowerCase())}) the chance falls to <b>${pctp(sc.downside.p_hit)}</b>.`
+    : `${esc(d.segment_label)} has a <b>${pctp(base.p_hit)}</b> chance to hit target, so the engine recommends keeping the current plan. In the downside case the chance falls to <b>${pctp(sc.downside.p_hit)}</b>.`;
+}
+
+function applyRecommendation() {
+  const d = decFor(), rec = d.recommended;
+  if (S.view === 0) { S.view = 1; render(); }
+  $("wi-promo").value = Math.max(-6, Math.min(6, rec.promo_delta)); $("wi-foot").value = 0; $("wi-ticket").value = 0;
+  whatIf();
+  const row = document.querySelector("#tested tr.recrow"); if (row) flashPanel(row.closest(".tbl-wrap"));
+  toast(rec.promo_delta ? `Recommended: ${rec.label}. Modeled +${fmt.sales(rec.delta_sales)}, chance ${pctp(decFor().p_hit)} → ${pctp(rec.p_hit)}. Model-based, not causal proof.` : `Recommended: keep the current plan (${pctp(decFor().p_hit)} chance to hit target).`, 4500);
+}
+
+function renderTrust() {
+  const tr = S.D.trust, cov = tr.coverage.sales, acc = tr.accuracy;
+  const ens = acc.find((a) => a.model === "Vantage ensemble"), ets = acc.find((a) => a.model.startsWith("ETS")), naive = acc.find((a) => a.model.startsWith("Same month"));
+  $("trust").innerHTML = `<div class="trustgrid">
+      <div class="tcard"><span class="k">Forecast accuracy</span><span class="v">${ens.mape_total.toFixed(1)}%</span><span class="x">average error, one month ahead (all stores) · ${fmt.sales(ens.mae_total)} average miss · goal ≤ ${S.D.meta.target_mape}%</span></div>
+      <div class="tcard"><span class="k">80% range calibration</span><span class="v">${Math.round(cov.coverage80 * 100)}%</span><span class="x">${cov.inside80} of ${cov.n} past outcomes landed inside the 80% range (${cov.segments} store groups × ${cov.months} months)</span></div>
+      <div class="tcard"><span class="k">95% range calibration</span><span class="v">${Math.round(cov.coverage95 * 100)}%</span><span class="x">${cov.inside95} of ${cov.n} landed inside the 95% range</span></div>
+      <div class="tcard"><span class="k">Against baselines</span><span class="v">${ets ? (ets.mape_total / ens.mape_total).toFixed(1) + "×" : "–"}</span><span class="x">lower error than ETS, Power BI's built-in method (${ets ? ets.mape_total.toFixed(1) : "–"}%)${naive ? ` · same month last year ${naive.mape_total.toFixed(1)}%` : ""}</span></div>
+    </div>
+    <p class="note"><b>Production model:</b> ${esc(tr.production_model)} · <b>lowest backtest error:</b> ${esc(tr.best_backtest_model)}${tr.best_backtest_model !== tr.production_model ? " (difference within noise; the blend is kept for robustness)" : ""}. ${esc(tr.method)} ${esc(tr.caveat)}</p>`;
+}
+
+function renderStoryV2() {
+  const D = S.D, ym = viewMonth(), n = S.view > 0 ? D.narratives[ym][S.seg] : null;
+  if (!n || !n.what) return false;
+  const c = (t) => esc(convertText(t)).replace(/ -(\d)/g, " −$1");
+  $("story-text").innerHTML = `<div class="lines"><div class="ln"><b>What?</b><span>${c(n.what)}</span></div><div class="ln"><b>Why?</b><span>${c(n.why)}</span></div><div class="ln"><b>What should I do?</b><span>${c(n.do)}</span></div></div>`;
+  $("story-src").textContent = n.source === "template" ? "Executive summary written from the decision engine's facts (template; Azure OpenAI GPT-4o used when configured)" : "Executive summary written by " + n.source + " from the decision engine's facts";
+  return true;
+}
+
+function demoMode() {
+  stopPlay(); if (!$("tour").hidden) tourEnd();
+  setCurrency("EUR"); resetWhatIf();
+  S.view = 1; S.seg = "All"; $("segment").value = "All"; S.metric = "sales"; S.animChart = true; render();
+  window.scrollTo({ top: 0, behavior: REDUCED ? "auto" : "smooth" });
+  toast(`Demo mode: ${MON(S.D.future_months[0], "long")} · all stores. Next: choose Store type D.`, 4500);
+  flashPanel($("segment").closest("label"));
+}
+
+function setupV2() {
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-go],[data-view]"); if (!b) return;
+    if (b.dataset.view) { S.view = +b.dataset.view; S.animChart = true; render(); return; }
+    goTo(b.dataset.go, b.dataset.seg);
+  });
+  $("rec-btn").onclick = applyRecommendation;
+  $("demo-btn").onclick = demoMode;
+  // deep links from the Teams card: ?segment=d&month=2026-10#scenarios
+  const q = new URLSearchParams(location.search);
+  if (q.get("segment") && S.D.series[q.get("segment")]) { S.seg = q.get("segment"); $("segment").value = S.seg; }
+  const qi = S.D.future_months.indexOf(q.get("month")); if (qi >= 0) S.view = qi + 1;
+}
+
+instrumentFetch();
+load();
+</script>

@@ -1,0 +1,93 @@
+// =====================================================================================
+// Vantage Horizon - Power BI measures on fct_kpi_forecast
+// Source: outputs/fct_kpi_forecast.csv (or the Fabric Lakehouse table of the same name).
+//
+// Table grain: one row per month x segment x metric x value_type
+//   segment    = "All" (chain total) or "a" / "b" / "c" / "d" (store types)
+//   metric     = "sales" | "customers" | "ticket"
+//   value_type = "actual" | "forecast" | "backtest"
+//   backtest rows are out-of-sample one-month-ahead forecasts (with their own lo80/hi80/lo95/hi95).
+//
+// IMPORTANT: the table holds BOTH the "All" total and the four store types. Every measure
+// therefore filters to ONE segment (the slicer selection, default "All"); summing across
+// segments would double count.
+//
+// Setup: add a disconnected table 'View' with column [View] =
+//   {"Last month", "Next month", "+60 days", "+90 days"} and use it as a single-select slicer.
+//   Use fct_kpi_forecast[segment] as a single-select slicer.
+// =====================================================================================
+
+Selected Segment =
+SELECTEDVALUE ( fct_kpi_forecast[segment], "All" )
+
+Selected Horizon =
+SWITCH ( SELECTEDVALUE ( View[View], "Next month" ),
+    "Last month", 0, "Next month", 1, "+60 days", 2, "+90 days", 3 )
+
+Last Actual Month =
+CALCULATE ( MAX ( fct_kpi_forecast[month] ),
+    REMOVEFILTERS ( fct_kpi_forecast ), fct_kpi_forecast[value_type] = "actual" )
+
+Sales (view) =
+VAR h = [Selected Horizon]
+VAR seg = [Selected Segment]
+VAR lastM = [Last Actual Month]
+RETURN
+IF ( h = 0,
+    CALCULATE ( SUM ( fct_kpi_forecast[value] ), REMOVEFILTERS ( fct_kpi_forecast ),
+        fct_kpi_forecast[metric] = "sales", fct_kpi_forecast[value_type] = "actual",
+        fct_kpi_forecast[segment] = seg, fct_kpi_forecast[month] = lastM ),
+    CALCULATE ( SUM ( fct_kpi_forecast[value] ), REMOVEFILTERS ( fct_kpi_forecast ),
+        fct_kpi_forecast[metric] = "sales", fct_kpi_forecast[value_type] = "forecast",
+        fct_kpi_forecast[segment] = seg, fct_kpi_forecast[horizon] = h ) )
+
+Sales low 80 =
+CALCULATE ( SUM ( fct_kpi_forecast[lo80] ), REMOVEFILTERS ( fct_kpi_forecast ),
+    fct_kpi_forecast[metric] = "sales", fct_kpi_forecast[value_type] = "forecast",
+    fct_kpi_forecast[segment] = [Selected Segment], fct_kpi_forecast[horizon] = [Selected Horizon] )
+
+Sales high 80 =
+CALCULATE ( SUM ( fct_kpi_forecast[hi80] ), REMOVEFILTERS ( fct_kpi_forecast ),
+    fct_kpi_forecast[metric] = "sales", fct_kpi_forecast[value_type] = "forecast",
+    fct_kpi_forecast[segment] = [Selected Segment], fct_kpi_forecast[horizon] = [Selected Horizon] )
+
+// Backtest MAPE: average over backtest months of |forecast - actual| / actual,
+// pairing each backtest forecast with the actual of THE SAME month and segment.
+// (A plain SUM(backtest) vs SUM(actual) would compare against every historical month.)
+Backtest MAPE % =
+VAR seg = [Selected Segment]
+VAR btMonths =
+    CALCULATETABLE ( VALUES ( fct_kpi_forecast[month] ), REMOVEFILTERS ( fct_kpi_forecast ),
+        fct_kpi_forecast[value_type] = "backtest", fct_kpi_forecast[metric] = "sales",
+        fct_kpi_forecast[segment] = seg )
+RETURN
+AVERAGEX ( btMonths,
+    VAR m = fct_kpi_forecast[month]
+    VAR f = CALCULATE ( SUM ( fct_kpi_forecast[value] ), REMOVEFILTERS ( fct_kpi_forecast ),
+        fct_kpi_forecast[value_type] = "backtest", fct_kpi_forecast[metric] = "sales",
+        fct_kpi_forecast[segment] = seg, fct_kpi_forecast[month] = m )
+    VAR a = CALCULATE ( SUM ( fct_kpi_forecast[value] ), REMOVEFILTERS ( fct_kpi_forecast ),
+        fct_kpi_forecast[value_type] = "actual", fct_kpi_forecast[metric] = "sales",
+        fct_kpi_forecast[segment] = seg, fct_kpi_forecast[month] = m )
+    RETURN ABS ( DIVIDE ( f - a, a ) ) )
+
+// Share of backtest months whose actual landed inside the out-of-sample 80% range
+Backtest 80% coverage =
+VAR seg = [Selected Segment]
+VAR btMonths =
+    CALCULATETABLE ( VALUES ( fct_kpi_forecast[month] ), REMOVEFILTERS ( fct_kpi_forecast ),
+        fct_kpi_forecast[value_type] = "backtest", fct_kpi_forecast[metric] = "sales",
+        fct_kpi_forecast[segment] = seg )
+RETURN
+AVERAGEX ( btMonths,
+    VAR m = fct_kpi_forecast[month]
+    VAR lo = CALCULATE ( SUM ( fct_kpi_forecast[lo80] ), REMOVEFILTERS ( fct_kpi_forecast ),
+        fct_kpi_forecast[value_type] = "backtest", fct_kpi_forecast[metric] = "sales",
+        fct_kpi_forecast[segment] = seg, fct_kpi_forecast[month] = m )
+    VAR hi = CALCULATE ( SUM ( fct_kpi_forecast[hi80] ), REMOVEFILTERS ( fct_kpi_forecast ),
+        fct_kpi_forecast[value_type] = "backtest", fct_kpi_forecast[metric] = "sales",
+        fct_kpi_forecast[segment] = seg, fct_kpi_forecast[month] = m )
+    VAR a = CALCULATE ( SUM ( fct_kpi_forecast[value] ), REMOVEFILTERS ( fct_kpi_forecast ),
+        fct_kpi_forecast[value_type] = "actual", fct_kpi_forecast[metric] = "sales",
+        fct_kpi_forecast[segment] = seg, fct_kpi_forecast[month] = m )
+    RETURN IF ( a >= lo && a <= hi, 1, 0 ) )

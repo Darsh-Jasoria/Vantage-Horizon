@@ -1,0 +1,146 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.4",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "VANTAGE HORIZON \u2014 ACTION REQUIRED",
+      "weight": "Bolder",
+      "size": "Medium",
+      "color": "Attention"
+    },
+    {
+      "type": "TextBlock",
+      "text": "Data as of 30 Sep 2026 \u00b7 model-based estimates, not guarantees",
+      "isSubtle": true,
+      "spacing": "None",
+      "size": "Small",
+      "wrap": true
+    },
+    {
+      "type": "FactSet",
+      "facts": [
+        {
+          "title": "Affected segment",
+          "value": "Store type D"
+        },
+        {
+          "title": "Risk level",
+          "value": "Critical"
+        },
+        {
+          "title": "Forecast",
+          "value": "EUR 76.7M (October 2026)"
+        },
+        {
+          "title": "Target",
+          "value": "EUR 79.0M"
+        },
+        {
+          "title": "Probability of target",
+          "value": "18%"
+        },
+        {
+          "title": "Leading indicator",
+          "value": "Footfall -7.6% vs expected (5 of 5 weeks flagged)"
+        },
+        {
+          "title": "Top reason",
+          "value": "Sustained footfall shortfall: customers 7.6% below expected last month"
+        },
+        {
+          "title": "Recommended scenario",
+          "value": "+5 promo days"
+        },
+        {
+          "title": "Modeled impact",
+          "value": "+EUR 4.4M modeled sales; target probability 18% \u2192 80%"
+        }
+      ]
+    },
+    {
+      "type": "TextBlock",
+      "wrap": true,
+      "size": "Small",
+      "isSubtle": true,
+      "text": "Scenario estimate from the forecast model; it is not causal proof."
+    },
+    {
+      "type": "TextBlock",
+      "wrap": true,
+      "text": "WHAT: October 2026 sales for Store type D are forecast at EUR 76.7M, +7.1% vs last month (80% range EUR 73.6M to EUR 79.9M), with an 18% chance of reaching the EUR 79.0M target.\nWHY: Sustained footfall shortfall: customers 7.6% below expected last month. Biggest modeled drivers vs last month: seasonality +4.6%, monthly trend model +1.5%.\nWHAT SHOULD I DO: Among the tested interventions, +5 promo days gives the strongest modeled improvement: +EUR 4.4M modeled sales; target probability 18% \u2192 80%. This is a model-based scenario estimate, not causal proof."
+    },
+    {
+      "type": "Container",
+      "style": "attention",
+      "items": [
+        {
+          "type": "TextBlock",
+          "text": "CRITICAL \u00b7 Store type D: footfall -7.6% vs expected",
+          "weight": "Bolder",
+          "wrap": true
+        },
+        {
+          "type": "TextBlock",
+          "text": "5 of the last 5 weeks were more than 2.5 standard deviations below the model. Footfall leads sales, so next month is at risk.",
+          "wrap": true,
+          "size": "Small"
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "style": "attention",
+      "items": [
+        {
+          "type": "TextBlock",
+          "text": "CRITICAL \u00b7 Store type D: 18% chance to hit October target",
+          "weight": "Bolder",
+          "wrap": true
+        },
+        {
+          "type": "TextBlock",
+          "text": "Forecast EUR 76.7M vs target EUR 79.0M (80% range EUR 73.6M to 79.9M).",
+          "wrap": true,
+          "size": "Small"
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "style": "warning",
+      "items": [
+        {
+          "type": "TextBlock",
+          "text": "WARNING \u00b7 All stores: 34% chance to hit October target",
+          "weight": "Bolder",
+          "wrap": true
+        },
+        {
+          "type": "TextBlock",
+          "text": "Forecast EUR 255.8M vs target EUR 257.6M (80% range EUR 250.1M to 261.5M).",
+          "wrap": true,
+          "size": "Small"
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.OpenUrl",
+      "title": "Open dashboard",
+      "url": "http://localhost:8000/?segment=d&month=2026-10"
+    },
+    {
+      "type": "Action.OpenUrl",
+      "title": "View forecast",
+      "url": "http://localhost:8000/?segment=d&month=2026-10#why"
+    },
+    {
+      "type": "Action.OpenUrl",
+      "title": "Open scenario",
+      "url": "http://localhost:8000/?segment=d&month=2026-10#scenarios"
+    }
+  ]
+}

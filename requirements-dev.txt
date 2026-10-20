@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest>=8
+# optional extra baseline, enable with VH_PROPHET=1
+# prophet>=1.1

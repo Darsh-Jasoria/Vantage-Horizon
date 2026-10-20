@@ -1,0 +1,8 @@
+version: 2
+sources:
+  - name: rossmann
+    description: Kaggle Rossmann Store Sales files (or the generated sample) in data/raw/
+    tables:
+      - name: train
+      - name: test
+      - name: store
